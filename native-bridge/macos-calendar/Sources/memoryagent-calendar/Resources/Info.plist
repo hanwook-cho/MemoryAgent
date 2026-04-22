@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>dev.memoryagent.calendar-bridge</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>MemoryAgent reads calendar events in the time range you specify for the calendar tool.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>MemoryAgent needs access to your calendars to list events in the range you request.</string>
+</dict>
+</plist>

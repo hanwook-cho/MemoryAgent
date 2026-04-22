@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "memoryagent-core"
+version = "0.1.0"
+description = "MemoryAgent local HTTP API and RAG host"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.109",
+  "uvicorn[standard]>=0.27",
+  "httpx>=0.26",
+  "chromadb>=0.5",
+  "pydantic>=2.9",
+  "watchdog>=4.0",
+  "pathspec>=0.12",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+memoryagent-core = "memoryagent.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["memoryagent"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+  "ignore:.*asyncio.iscoroutinefunction.*:DeprecationWarning",
+]
