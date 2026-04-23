@@ -95,6 +95,18 @@ Scope and acceptance bullets are canonical in [`mp1-pr1.md`](mp1-pr1.md).
 
 **Exit:** PR-1 merged with tests above; no change to default user-visible behavior documented in [`mp1-pr1.md`](mp1-pr1.md).
 
+### 7.2 MP1 — PR-2 (health `deployment` / degraded)
+
+Scope: [`mp1-pr2.md`](mp1-pr2.md).
+
+| Goal | Automated | Manual / smoke |
+| :--- | :--- | :--- |
+| Health includes `deployment` | **Integration:** `GET /health` has `deployment.mode`, `degraded`, `degraded_reason`; `standalone` → not degraded | — |
+| Non-standalone marks degraded | **Integration:** `PATCH /config` `deployment_mode` → `host_edge`, then `GET /health` shows `degraded: true` and non-empty reason | — |
+| Unit helper | **Unit:** `health_deployment_block` for `standalone` vs `host_edge` | — |
+
+**Exit:** PR-2 merged; [`client-api.md`](client-api.md) health example updated.
+
 ## 8. Optional — Native shell
 
 | Goal | Automated | Manual |
@@ -330,4 +342,5 @@ Use when there is no Settings UI yet: `<BASE>` and `<TOKEN>` as in the table abo
 - [`client-api.md`](client-api.md) — contract under test
 - [`agent-actions.md`](agent-actions.md) — tool behaviors to cover in M4
 - [`mp1-pr1.md`](mp1-pr1.md) — first MP1 code PR scope; **§7.1** above maps tests to that PR
+- [`mp1-pr2.md`](mp1-pr2.md) — MP1 PR-2 health deployment/degraded; **§7.2**
 - [`mp1-verification-checklist.md`](mp1-verification-checklist.md) — pre-implementation spec gate (before PR-1 code)

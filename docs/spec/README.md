@@ -20,6 +20,7 @@ This folder expands the high-level [`requirement.md`](../../requirement.md) into
 | [`document-format-vnext-plan.md`](document-format-vnext-plan.md) | Next-version roadmap for additional document formats (xlsx/pptx/OCR/email/etc.) |
 | [`distributed-future-plan.md`](distributed-future-plan.md) | Future architecture plan across host OS, optional edge index node, hybrid retrieval, and iOS companion |
 | [`mp1-pr1.md`](mp1-pr1.md) | MP1 first code PR: local backend adapters + `deployment_mode` |
+| [`mp1-pr2.md`](mp1-pr2.md) | MP1 PR-2: health `deployment` block + degraded flag for non-standalone |
 | [`mp1-verification-checklist.md`](mp1-verification-checklist.md) | Pre-implementation GO/NO-GO checklist before MP1 coding |
 | [`google-calendar-integration.md`](google-calendar-integration.md) | Google Calendar + local EventKit product rules and phases |
 

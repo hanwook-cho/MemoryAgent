@@ -19,6 +19,7 @@ from memoryagent import __version__
 from memoryagent.auth_http import BearerChecker
 from memoryagent.backends import build_local_backends
 from memoryagent.config_store import KNOWN_DEPLOYMENT_MODES, load_config, save_config
+from memoryagent.deployment_runtime import health_deployment_block
 from memoryagent.embeddings import DeterministicEmbedder, Embedder, OllamaEmbedder
 from memoryagent.folder_picker import pick_folder_macos
 from memoryagent.llm_client import FakeLlm, LlmClient, OllamaLlm
@@ -131,6 +132,7 @@ def create_app(
         return {
             "status": "ok",
             "version": __version__,
+            "deployment": health_deployment_block(c.deployment_mode),
             "llm": {
                 "backend": "ollama",
                 "reachable": reachable,
