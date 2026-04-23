@@ -4,6 +4,8 @@
 
 Define the product requirements for MP1: introducing a distributed-capable architecture while preserving current standalone behavior and user experience.
 
+**Umbrella product PRD** (all phases, not only MP1): [`prd-full-product.md`](prd-full-product.md).
+
 This PRD is implementation-oriented and based on:
 
 - [`architecture.md`](architecture.md)

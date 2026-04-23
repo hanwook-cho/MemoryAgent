@@ -5,7 +5,8 @@ This folder expands the high-level [`requirement.md`](../../requirement.md) into
 | Document | Contents |
 | :--- | :--- |
 | [`architecture.md`](architecture.md) | Processes, components, data flow, web app vs native helper |
-| [`prd-mp1-distributed.md`](prd-mp1-distributed.md) | Clean product requirements document for MP1 distributed architecture foundation |
+| [`prd-full-product.md`](prd-full-product.md) | **Full-product PRD** — vision, goals, and **phased roadmap** (M5, Google Calendar, MP1, edge, mobile, formats, optional OS depth) |
+| [`prd-mp1-distributed.md`](prd-mp1-distributed.md) | **MP1-only** PRD: distributed architecture foundation (subset of full PRD Phase 3) |
 | [`srs-mp1-distributed.md`](srs-mp1-distributed.md) | Software requirements specification for MP1 distributed architecture foundation |
 | [`data-model.md`](data-model.md) | Memory records, chunks, embeddings, Markdown sync |
 | [`client-api.md`](client-api.md) | Client API (HTTP/WebSocket) for web, desktop, and mobile clients |

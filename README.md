@@ -4,7 +4,7 @@
 
 ## Documentation and roadmap
 
-Planned **distributed / MP1** work (multi-host, optional edge node, Client vs Node API), **PRD/SRS**, verification checklists, **Google Calendar** integration rules, and milestone tests all live under **[`docs/spec/README.md`](docs/spec/README.md)** (indexed table—not “local app only”).
+Planned **distributed / MP1** work (multi-host, optional edge node, Client vs Node API), **PRD/SRS**, verification checklists, **Google Calendar** integration rules, and milestone tests all live under **[`docs/spec/README.md`](docs/spec/README.md)** (indexed table—not “local app only”). The **full-product phased roadmap** is in **[`docs/spec/prd-full-product.md`](docs/spec/prd-full-product.md)**; **[`docs/spec/prd-mp1-distributed.md`](docs/spec/prd-mp1-distributed.md)** scopes **MP1 only**.
 
 **On GitHub:** the repository **front page** shows the **default** branch (`main`). That branch can **lag** behind integration work. To read the same **README** and **spec tree** as current development, use the branch menu and select **`ma-dist`**, or merge **`ma-dist` → `main`** when you want the default view to catch up (see open PRs).
 
