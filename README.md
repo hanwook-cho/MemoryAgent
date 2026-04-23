@@ -1,6 +1,6 @@
 # MemoryAgent
 
-Local-first memory assistant for macOS — see [`requirement.md`](requirement.md) and [`docs/spec/`](docs/spec/README.md).
+**MemoryAgent** is a **local-first** memory and retrieval assistant for **macOS**. You use a **local web UI** backed by an on-device **HTTP API** (by default on **127.0.0.1**) for chat with **RAG** over files you choose to watch and facts you save; **embeddings and chat** run **on the Mac** by default (no cloud required for core use). **Tools** (for example **EventKit** calendar read/create) use a small **Swift bridge** where the OS requires it. Formal requirements: [`requirement.md`](requirement.md); API, architecture, and milestones: [`docs/spec/`](docs/spec/README.md).
 
 ## Stack (M4)
 
@@ -58,7 +58,7 @@ Open **http://127.0.0.1:8765/** — static UI loads from `web/dist`. The first l
 | **Calendar permission denied from API but manual helper works** | TCC is per host app/process. Run `./scripts/run.sh` from Terminal.app once (or enable Calendar for Cursor/Python host process) and retry. |
 
 - **API docs (OpenAPI):** http://127.0.0.1:8765/api/v1/docs  
-- **Health (no auth):** `GET /api/v1/health`
+- **Health (no auth):** `GET /api/v1/health` (includes `deployment` / degraded flags when config uses non-`standalone` modes; see OpenAPI)
 
 **Web dev (Vite proxy):** `cd web && npm run dev` → uses proxy to port 8765; run the core separately.
 
