@@ -2,6 +2,8 @@
 
 ## 1. Scope
 
+**Full-product SRS** (all phases): [`srs-full-product.md`](srs-full-product.md).
+
 This SRS defines software requirements for MP1 architectural groundwork to support:
 
 - `standalone`
