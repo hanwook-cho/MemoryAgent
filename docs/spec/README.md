@@ -19,6 +19,9 @@ This folder expands the high-level [`requirement.md`](../../requirement.md) into
 | [`pdf-docx-index-plan.md`](pdf-docx-index-plan.md) | Phased plan for index DB + PDF/DOCX ingestion support |
 | [`document-format-vnext-plan.md`](document-format-vnext-plan.md) | Next-version roadmap for additional document formats (xlsx/pptx/OCR/email/etc.) |
 | [`distributed-future-plan.md`](distributed-future-plan.md) | Future architecture plan across host OS, optional edge index node, hybrid retrieval, and iOS companion |
+| [`mp1-pr1.md`](mp1-pr1.md) | MP1 first code PR: local backend adapters + `deployment_mode` |
+| [`mp1-verification-checklist.md`](mp1-verification-checklist.md) | Pre-implementation GO/NO-GO checklist before MP1 coding |
+| [`google-calendar-integration.md`](google-calendar-integration.md) | Google Calendar + local EventKit product rules and phases |
 
 **Primary interaction:** users operate a **local web application** in the browser, backed by an on-device API. **Inference** uses a **Mac-local LLM** (e.g. Ollama, **mlx-lm** / MLX), not a remote API, for default operation. Optional native surfaces (menu bar, CLI) complement but are not required for core chat and memory audit flows.
 
