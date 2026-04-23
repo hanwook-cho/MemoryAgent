@@ -203,6 +203,7 @@ flowchart LR
 
 | Topic | Document |
 | :--- | :--- |
+| Full-product software requirements | [`srs-full-product.md`](srs-full-product.md) |
 | MP1 only | [`prd-mp1-distributed.md`](prd-mp1-distributed.md) |
 | SRS MP1 | [`srs-mp1-distributed.md`](srs-mp1-distributed.md) |
 | Calendar opt-in | [`google-calendar-integration.md`](google-calendar-integration.md) |

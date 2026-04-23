@@ -338,6 +338,8 @@ Use when there is no Settings UI yet: `<BASE>` and `<TOKEN>` as in the table abo
 
 ## 11. Related documents
 
+- [`prd-full-product.md`](prd-full-product.md) — full-product phased roadmap
+- [`srs-full-product.md`](srs-full-product.md) — full-product SHALL requirements and verification matrix
 - [`milestones.md`](milestones.md) — acceptance themes
 - [`client-api.md`](client-api.md) — contract under test
 - [`agent-actions.md`](agent-actions.md) — tool behaviors to cover in M4
