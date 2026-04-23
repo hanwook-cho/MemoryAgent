@@ -126,6 +126,38 @@ Optional filters:
 
 `GET /tools`, `POST /tools/invoke`.
 
+### 3.11 Admin/Debug mode (restricted)
+
+These endpoints are for admin/debug workflows and SHOULD be hidden behind explicit UI mode + stronger auth policy.
+
+`GET /admin/status`
+
+- Consolidated diagnostics snapshot (host + optional edge summary): queue depth, active jobs, degraded flags, backend reachability.
+
+`GET /admin/events?level=error&since=<iso>&limit=200`
+
+- Sanitized operational event stream (no secrets/token leakage).
+
+`POST /admin/control/reindex`
+
+- Trigger controlled reindex from client side (host handles local/remote execution policy).
+
+`POST /admin/control/restart`
+
+- Soft restart of workers/adapters without deleting persisted data.
+
+`POST /admin/control/cold-start`
+
+- Rebuild runtime state from persisted stores; no persistent data deletion.
+
+`POST /admin/control/reset-index`
+
+- Clears index stores and triggers full reindex (destructive for index data; source files remain).
+
+`POST /admin/control/factory-reset` (optional, highest risk)
+
+- Wipes local app state/config/index; requires explicit multi-step confirmation.
+
 ## 4. Web app static files
 
 - Production: serve built assets from host backend.
@@ -138,6 +170,7 @@ Optional filters:
 | Other local processes calling the API | Bearer token + bind controls |
 | CSRF from malicious site | Same-origin policy; no broad CORS |
 | XSS in web UI | CSP + sanitization |
+| Debug/admin misuse | Role/scope-gated endpoints, explicit debug-mode flag, audit log entries |
 
 ## 6. Error shape
 
@@ -151,3 +184,9 @@ Optional filters:
 ```
 
 Codes include: `UNAUTHORIZED`, `VALIDATION`, `MODEL_UNAVAILABLE`, `INDEX_BUSY`, `PERMISSION_DENIED`.
+
+Admin/control endpoints should also use:
+
+- `FORBIDDEN`
+- `UNAVAILABLE`
+- `TIMEOUT`

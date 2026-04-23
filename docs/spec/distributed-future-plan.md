@@ -391,6 +391,9 @@ Minimum cross-node endpoints (normative target):
 
 ## 7.2 Canonical message schemas (normative draft)
 
+Canonical endpoint-level parameter/response definitions are maintained in [`node-api.md`](node-api.md).
+This section remains as architecture-level context and examples.
+
 Shared envelope conventions:
 
 - Timestamps use ISO-8601 with timezone.
@@ -674,13 +677,30 @@ Client UX requirement:
   - when response succeeds via fallback, clients must show a visible limited-source warning.
   - client should expose degraded metadata to users and logs for troubleshooting.
 
+## 7.6 Admin/Debug mode control support
+
+Client-side Admin/Debug mode is supported through Host Backend control endpoints.
+
+Supported control classes:
+
+- status/diagnostics (`/admin/status`, `/admin/events`)
+- operational control (`/admin/control/reindex`, `/admin/control/restart`)
+- recovery control (`/admin/control/cold-start`)
+- destructive recovery (`/admin/control/reset-index`, optional `/admin/control/factory-reset`)
+
+Safety requirements:
+
+- Admin/Debug mode must be explicitly enabled.
+- Sensitive actions require stronger confirmation (for example: typed confirmation + scope preview).
+- All control actions must be auditable (who, when, action, scope, result).
+- Destructive operations must provide backup/export guidance when available.
+
 ## 7.5 Review decision hooks
 
 The following decisions must be explicitly chosen during design review:
 
 - API spec ownership:
-  - keep `client-api.md` Client API only and define Node API in this document, or
-  - merge both into one unified API specification.
+  - keep `client-api.md` for Client API and `node-api.md` for Node API.
 - Security baseline for distributed mode:
   - token+TLS baseline vs mandatory mTLS.
 - Hybrid retrieval default merge policy:

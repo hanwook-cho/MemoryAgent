@@ -102,6 +102,8 @@ In standalone mode, all adapters resolve locally. In distributed modes, retrieva
 3. Context + tool results are passed to `LlmBackend`; response streams back to client.
 4. Assistant turns may invoke tools (file search, **memory save**, **calendar read/create**, etc.) with explicit policy checks; see [`agent-actions.md`](agent-actions.md).
 
+**Calendar sources:** If the user does **not** select **Include Google Calendar**, only the **local** platform calendar is used (e.g. EventKit on macOS); Google APIs are not called (tokens may remain stored per policy). If they **do** select it and OAuth succeeds, **both** local and **Google Calendar** are used. **Disconnect Google** removes credentials. Details: [`google-calendar-integration.md`](google-calendar-integration.md).
+
 ## 6. Data flow (ingestion path)
 
 1. File system events or scheduled scans enqueue **raw documents** with metadata (path, mtime, source).
@@ -120,6 +122,7 @@ In standalone mode, all adapters resolve locally. In distributed modes, retrieva
 - **Binding:** Host API defaults to loopback for local mode; distributed mode explicitly configures reachable interfaces.
 - **Transport:** HTTP for local development, HTTPS required for networked control plane.
 - **Security model:** Token auth baseline; mTLS-ready design for stronger network trust boundaries.
+- **Admin/Debug mode:** privileged control endpoints are available only in explicit debug/admin mode with stronger confirmation and audit requirements.
 
 ## 9. Endpoint surfaces (where they live)
 
@@ -146,7 +149,8 @@ In standalone mode, all adapters resolve locally. In distributed modes, retrieva
 ### 9.3 Documentation ownership
 
 - Client API route contracts: [`client-api.md`](client-api.md)
-- Node API route contracts and distributed mode behavior: [`distributed-future-plan.md`](distributed-future-plan.md)
+- Node API route contracts: [`node-api.md`](node-api.md)
+- Distributed mode behavior and decisions: [`distributed-future-plan.md`](distributed-future-plan.md)
 
 ## 10. Technology choices (open items)
 
