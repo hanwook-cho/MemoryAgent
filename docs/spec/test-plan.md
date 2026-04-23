@@ -16,7 +16,7 @@ This document maps **each milestone** in [`milestones.md`](milestones.md) to **w
 
 | Goal | Automated | Manual / smoke |
 | :--- | :--- | :--- |
-| Core starts, binds loopback | **Integration:** `GET /health` → 200, JSON shape per [`http-api.md`](http-api.md) | First launch generates token on disk |
+| Core starts, binds loopback | **Integration:** `GET /health` → 200, JSON shape per [`client-api.md`](client-api.md) | First launch generates token on disk |
 | Bearer enforced | **Integration:** request without `Authorization` → 401; with token → 200 on protected routes | — |
 | Static web served | **Optional E2E:** `GET /` → 200, `Content-Type` HTML | Open in browser |
 | Docs in sync | **CI:** link check or OpenAPI diff if OpenAPI exists | Review |
@@ -101,7 +101,7 @@ Use these when **automated** coverage is insufficient or before a release. Repla
 
 | Placeholder | Meaning |
 | :--- | :--- |
-| `<BASE>` | API base, e.g. `http://127.0.0.1:<PORT>/api/v1` (see [`http-api.md`](http-api.md)) |
+| `<BASE>` | API base, e.g. `http://127.0.0.1:<PORT>/api/v1` (see [`client-api.md`](client-api.md)) |
 | `<TOKEN>` | Bearer token from first-run `secrets/` or app UI |
 | `<WEB>` | Web UI URL, e.g. `http://127.0.0.1:<PORT>/` |
 
@@ -312,5 +312,5 @@ Use when there is no Settings UI yet: `<BASE>` and `<TOKEN>` as in the table abo
 ## 11. Related documents
 
 - [`milestones.md`](milestones.md) — acceptance themes
-- [`http-api.md`](http-api.md) — contract under test
+- [`client-api.md`](client-api.md) — contract under test
 - [`agent-actions.md`](agent-actions.md) — tool behaviors to cover in M4

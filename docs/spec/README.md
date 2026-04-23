@@ -6,7 +6,7 @@ This folder expands the high-level [`requirement.md`](../../requirement.md) into
 | :--- | :--- |
 | [`architecture.md`](architecture.md) | Processes, components, data flow, web app vs native helper |
 | [`data-model.md`](data-model.md) | Memory records, chunks, embeddings, Markdown sync |
-| [`http-api.md`](http-api.md) | Local HTTP/WebSocket API for the **web-based UI** |
+| [`client-api.md`](client-api.md) | Client API (HTTP/WebSocket) for web, desktop, and mobile clients |
 | [`agent-actions.md`](agent-actions.md) | Chat-triggered **save to memory** and **create calendar event** |
 | [`onboarding.md`](onboarding.md) | First-run chat welcome copy, dismissal, client persistence |
 | [`permissions-matrix.md`](permissions-matrix.md) | macOS capabilities, when to ask, fallbacks |

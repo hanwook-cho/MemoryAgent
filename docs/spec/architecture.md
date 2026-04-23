@@ -2,34 +2,41 @@
 
 ## 1. Goals
 
-- **Local-first:** All durable state and inference stay on the Mac; no cloud dependency for core features ([`requirement.md`](../../requirement.md) FR-8, NFR-3).
-- **Web-first UX:** The main interface is a **browser-based app** talking to a **local-only** HTTP API (see [`http-api.md`](http-api.md)).
-- **Observable OS data:** File watching and Apple integrations run where macOS APIs are available (typically a native helper or privileged subprocess), feeding the same memory pipeline as manual entries. **Phasing:** prefer **user-chosen folders** and **EventKit** (Calendar / Reminders) before fragile or unsupported sources; see [`requirement.md`](../../requirement.md) §2.1.1 and [`milestones.md`](milestones.md).
-- **On-device LLM:** Chat and tool-using turns call a **local** inference runtime on the Mac (no cloud LLM in the default configuration). Prefer **Apple Silicon–friendly** stacks—e.g. **Ollama** (separate daemon + HTTP), **MLX** via **[mlx-lm](https://github.com/ml-explore/mlx-lm)** (Python: load models and generate in-process or behind a thin local server), or **llama.cpp**-compatible servers—so latency and memory stay predictable on M-series hardware.
+- **Local-first:** Durable state remains user-controlled on local or user-owned nodes; cloud dependency is optional, not required for core features ([`requirement.md`](../../requirement.md) FR-8, NFR-3).
+- **HTTP-first app surface:** User-facing clients communicate through HTTP(S) API contracts (see [`client-api.md`](client-api.md)).
+- **Portable deployment modes:** Same orchestration logic supports standalone and distributed topologies via backend adapters; see [`distributed-future-plan.md`](distributed-future-plan.md).
+- **Platform-capability ingestion:** Source access depends on platform adapters/permissions (desktop/mobile), feeding the same memory pipeline.
+- **LLM placement flexibility:** LLM can run local to host or remote service while preserving the same orchestrator behavior.
 
-## 2. Logical components
+### Canonical role names
+
+- **Client**: user-facing app surface (web/desktop/mobile).
+- **Host Backend**: primary API + orchestrator runtime that serves Client API.
+- **Edge Node**: optional ingest/retrieval runtime used by Host Backend through Node API.
+
+## 2. Logical components (standalone baseline)
 
 ```mermaid
 flowchart LR
-  subgraph client [Browser]
-    WebUI[Web app SPA]
+  subgraph client [Client]
+    WebUI[Web app / desktop client]
   end
-  subgraph runtime [Local runtime]
+  subgraph runtime [Host runtime]
     API[HTTP API server]
-    Agent[Orchestrator LangGraph or equivalent]
+    Agent[Orchestrator]
     RAG[RAG pipeline]
-    Emb[Local embeddings]
-    LLM[Local LLM Ollama MLX etc]
+    Emb[Embeddings]
+    LLM[LlmBackend local/remote]
     VDB[(Vector DB)]
-    FS[(Markdown and raw files)]
+    FS[(Source files)]
     Obs[Observation service]
-    Tools[Tool adapters MCP or in-process]
+    Tools[Tool adapters]
   end
-  subgraph os [macOS]
+  subgraph os [OS integrations]
     Cal[Calendar Reminders Notes]
     Paths[Watched folders]
   end
-  WebUI -->|localhost only| API
+  WebUI --> API
   API --> Agent
   Agent --> RAG
   Agent --> LLM
@@ -43,38 +50,105 @@ flowchart LR
   Tools --> Paths
 ```
 
-## 3. Process model (recommended)
+## 3. Deployment topology (distributed-capable)
+
+```mermaid
+flowchart LR
+  subgraph Client["Client surfaces"]
+    Desktop["Desktop/Web Client"]
+    Mobile["iOS/Android Client"]
+  end
+  subgraph Host["Host Runtime"]
+    Orch["Orchestrator"]
+    RB["RetrievalBackend adapter"]
+    IB["IngestBackend adapter"]
+    LB["LlmBackend adapter"]
+    LocalStore["Local index (optional)"]
+  end
+  subgraph Edge["Edge index node (optional)"]
+    EdgeAPI["HTTPS node API"]
+    EdgeIdx["Ingest + Retrieval services"]
+    EdgeStore["Vector DB + File Index DB"]
+  end
+  Desktop --> Orch
+  Mobile --> Orch
+  Orch --> RB
+  Orch --> IB
+  Orch --> LB
+  RB --> LocalStore
+  IB --> LocalStore
+  RB --> EdgeAPI
+  IB --> EdgeAPI
+  EdgeAPI --> EdgeIdx
+  EdgeIdx --> EdgeStore
+```
+
+## 4. Process model (recommended)
 
 | Process | Role |
 | :--- | :--- |
-| **Core service** | Hosts HTTP API, RAG, embeddings, vector DB access, chat orchestration. Single user, single machine. |
+| **Core service (host)** | Hosts user-facing HTTP API + orchestrator and backend adapters. |
 | **Web static assets** | Served by the same core service (embedded) or a dev Vite server in development only. Production build: same-origin API and UI. |
-| **Observation worker** | May run in-process (simplest) or as a child process with IPC if isolation is needed for stability or CPU caps. |
+| **Observation worker** | May run on host or edge node depending on deployment mode. |
 | **Native bridge (optional)** | Small Swift helper if EventKit, AppleScript, or system UI automation requires it; exposes narrow IPC to the core service. |
+| **Edge index node (optional)** | Dedicated ingest/retrieval node exposed via HTTPS control API. |
 
-Keeping the **API and RAG in one service** avoids distributed transactions and simplifies the zero-cloud guarantee.
+In standalone mode, all adapters resolve locally. In distributed modes, retrieval/ingest adapters may target remote edge services while preserving one orchestration path.
 
-## 4. Data flow (query path)
+## 5. Data flow (query path)
 
-1. User submits a prompt in the web app → `POST` chat or WebSocket message to local API.
-2. Orchestrator may rewrite or decompose the query; retriever pulls top-k chunks from the vector store (and optional keyword/hybrid ranker).
-3. Context + tool results are passed to the local LLM; response streamed to the client (SSE or WebSocket).
+1. User submits a prompt from desktop/mobile client to host API.
+2. Orchestrator calls `RetrievalBackend` (local, remote, or hybrid fan-out).
+3. Context + tool results are passed to `LlmBackend`; response streams back to client.
 4. Assistant turns may invoke tools (file search, **memory save**, **calendar read/create**, etc.) with explicit policy checks; see [`agent-actions.md`](agent-actions.md).
 
-## 5. Data flow (ingestion path)
+## 6. Data flow (ingestion path)
 
 1. File system events or scheduled scans enqueue **raw documents** with metadata (path, mtime, source).
 2. Extraction supports `.md`, `.txt`, `.pdf`, `.docx` with per-format size guardrails and timeout/error handling.
 3. File index metadata DB decides skip/reindex for unchanged files; changed files continue to chunking (see [`data-model.md`](data-model.md)).
 4. Embeddings computed locally → upsert into vector DB; **human-readable** Markdown mirrors updated per policy (not necessarily 1:1 with every chunk).
 
-## 6. Web UI constraints
+## 7. Degraded/fallback behavior
 
-- **Binding:** Default `127.0.0.1` on a configurable port; document that binding to `0.0.0.0` is opt-in and weakens the local trust boundary.
-- **Transport:** `http://localhost` is acceptable for MVP; optional TLS for local dev parity only if needed.
-- **Security model:** Treat the API as **authenticated local use** (e.g. random token on first launch stored in app support, required header or cookie). Prevents other local processes from silently driving the agent without user intent.
+- If remote retrieval is unavailable, host falls back to local retrieval when available and marks response metadata as degraded.
+- If both retrieval paths fail, API returns `UNAVAILABLE` with retryable guidance.
+- Ingest/control failures on remote edge return explicit action errors; no silent success.
 
-## 7. Technology choices (open items)
+## 8. Web/API constraints
+
+- **Binding:** Host API defaults to loopback for local mode; distributed mode explicitly configures reachable interfaces.
+- **Transport:** HTTP for local development, HTTPS required for networked control plane.
+- **Security model:** Token auth baseline; mTLS-ready design for stronger network trust boundaries.
+
+## 9. Endpoint surfaces (where they live)
+
+### 9.1 Client API (client -> host)
+
+- Base: `http://127.0.0.1:<port>/api/v1/` (local mode), `https://<host>/api/v1/` (distributed)
+- Example routes:
+  - `POST /api/v1/chat`
+  - `POST /api/v1/chat/stream`
+  - `POST /api/v1/memory/entries`
+  - `GET /api/v1/memory/search`
+  - `GET /api/v1/config`
+
+### 9.2 Node API (host -> edge, distributed modes)
+
+- Base: `https://<edge-node>/` (or implementation-specific prefix)
+- Example routes:
+  - `GET /health`
+  - `GET /index/status`
+  - `POST /retrieve`
+  - `POST /ingest`
+  - `POST /control/reindex`
+
+### 9.3 Documentation ownership
+
+- Client API route contracts: [`client-api.md`](client-api.md)
+- Node API route contracts and distributed mode behavior: [`distributed-future-plan.md`](distributed-future-plan.md)
+
+## 10. Technology choices (open items)
 
 | Area | Options | Decision record |
 | :--- | :--- | :--- |
@@ -83,7 +157,7 @@ Keeping the **API and RAG in one service** avoids distributed transactions and s
 | Orchestration | LangGraph, CrewAI, custom | Pick based on team familiarity and debuggability. |
 | Native UI | Swift menu bar (optional) | Defer after web MVP unless OS integration requires it sooner. |
 
-## 8. Non-functional mapping
+## 11. Non-functional mapping
 
 - **NFR-1 (2s to first token):** Budget includes retrieval + prompt assembly + model cold start; define a “warm” vs “cold” scenario in tests.
 - **NFR-2 (5% CPU idle):** Observation uses debouncing, batching, and pauses when on battery if configured later.

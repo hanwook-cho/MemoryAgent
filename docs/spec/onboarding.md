@@ -21,7 +21,7 @@ Use **`localStorage`** (same origin as the web app) so the welcome state survive
 | `memoryagent.chatWelcome.dismissed` | `"true"` | User has completed first-run welcome for the current major copy version. |
 | `memoryagent.chatWelcome.version` | string, e.g. `"1"` | Must match `WELCOME_COPY_VERSION` in §3; if the spec version bumps and stored version differs, show welcome again once. |
 
-**Optional server parity:** `config.json` may mirror `ui.chat_welcome_dismissed` for consistency with CLI or multi-device use later; the web app can PATCH via [`http-api.md`](http-api.md) when implemented.
+**Optional server parity:** `config.json` may mirror `ui.chat_welcome_dismissed` for consistency with CLI or multi-device use later; the web app can PATCH via [`client-api.md`](client-api.md) when implemented.
 
 ## 3. Canonical copy (user-facing)
 

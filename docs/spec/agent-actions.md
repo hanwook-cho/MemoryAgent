@@ -6,7 +6,7 @@ This document specifies **user-initiated capabilities** exposed through **chat**
 
 | Capability | User intent (examples) | Backend | macOS permission |
 | :--- | :--- | :--- | :--- |
-| **Remember / memorize** | “Remember that my bike lock code is 0421”, “Note this: …” | Ingest like [`http-api.md`](http-api.md) `POST /memory/entries` → chunk + embed + vector upsert | None beyond app storage (NFR-3) |
+| **Remember / memorize** | “Remember that my bike lock code is 0421”, “Note this: …” | Ingest like [`client-api.md`](client-api.md) `POST /memory/entries` → chunk + embed + vector upsert | None beyond app storage (NFR-3) |
 | **Create calendar event** | “Put a meeting on my calendar Tuesday 3pm”, “Remind me on the calendar …” (interpreted as **event**, not Reminders) | **EventKit** create in native bridge; optional HTTP wrapper below | **Calendars** (see [`permissions-matrix.md`](permissions-matrix.md)) |
 | **Place / address reuse** | “Dentist appointment July 1 at 2pm” (no address given) | **Read** past events + **memory search** to fill `location`; see §3.4 | Same **Calendars** read as query; **none** extra for memory |
 
@@ -110,7 +110,7 @@ When the user schedules a **recurring-style** appointment (dentist, doctor, salo
 
 ## 4. HTTP API (optional wrappers)
 
-The orchestrator may call in-process services; exposing REST keeps CLI and tests aligned with [`http-api.md`](http-api.md).
+The orchestrator may call in-process services; exposing REST keeps CLI and tests aligned with [`client-api.md`](client-api.md).
 
 ### 4.1 `POST /memory/entries`
 

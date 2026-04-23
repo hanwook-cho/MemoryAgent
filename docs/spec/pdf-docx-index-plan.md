@@ -65,7 +65,7 @@ Current implementation files:
 - `services/core/memoryagent/vector_store.py`
 - `services/core/memoryagent/app.py`
 - `services/core/tests/test_m2.py`
-- `docs/spec/http-api.md`
+- `docs/spec/client-api.md`
 
 ## Safety and performance constraints
 
