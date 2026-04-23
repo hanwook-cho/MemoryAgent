@@ -2,6 +2,12 @@
 
 **MemoryAgent** is a **local-first** memory and retrieval assistant for **macOS**. You use a **local web UI** backed by an on-device **HTTP API** (by default on **127.0.0.1**) for chat with **RAG** over files you choose to watch and facts you save; **embeddings and chat** run **on the Mac** by default (no cloud required for core use). **Tools** (for example **EventKit** calendar read/create) use a small **Swift bridge** where the OS requires it. Formal requirements: [`requirement.md`](requirement.md); API, architecture, and milestones: [`docs/spec/`](docs/spec/README.md).
 
+## Documentation and roadmap
+
+Planned **distributed / MP1** work (multi-host, optional edge node, Client vs Node API), **PRD/SRS**, verification checklists, **Google Calendar** integration rules, and milestone tests all live under **[`docs/spec/README.md`](docs/spec/README.md)** (indexed table—not “local app only”).
+
+**On GitHub:** the repository **front page** shows the **default** branch (`main`). That branch can **lag** behind integration work. To read the same **README** and **spec tree** as current development, use the branch menu and select **`ma-dist`**, or merge **`ma-dist` → `main`** when you want the default view to catch up (see open PRs).
+
 ## Stack (M4)
 
 - **Vector DB:** [Chroma](https://www.trychroma.com/) (persistent under `MEMORYAGENT_DATA_DIR/store/vector/chroma`).
