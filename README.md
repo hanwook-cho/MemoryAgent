@@ -2,8 +2,6 @@
 
 Local-first memory assistant for macOS — see [`requirement.md`](requirement.md) and [`docs/spec/`](docs/spec/README.md).
 
-**Pull requests:** target the **`ma-dist`** branch by default (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-
 ## Stack (M4)
 
 - **Vector DB:** [Chroma](https://www.trychroma.com/) (persistent under `MEMORYAGENT_DATA_DIR/store/vector/chroma`).
@@ -154,3 +152,7 @@ Use these patterns in chat for the best results:
   `schedule dentist checkup at 2026-07-01T14:00:00Z to 2026-07-01T15:00:00Z in Smile Clinic`
 
 In app chat, ask **`what can you do for me?`** (or **`help`**) to get this capability guide.
+
+## Contributing
+
+How to propose changes, run tests, and open pull requests is described in [`CONTRIBUTING.md`](CONTRIBUTING.md). That workflow is **not** tied to a single Git branch name in this README; clone any default branch and follow the guide there.
