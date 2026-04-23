@@ -1,0 +1,210 @@
+# PRD — MemoryAgent (full product)
+
+## 1. Document control
+
+| Field | Value |
+| :--- | :--- |
+| **Audience** | Product, engineering, and partners aligning scope across years, not a single milestone. |
+| **Normative depth** | This PRD states **what** and **why** by phase; **how** lives in linked specs (`architecture`, APIs, data model, test plan). |
+| **Subset PRDs** | [`prd-mp1-distributed.md`](prd-mp1-distributed.md) remains the **MP1-only** contract; it is **incorporated by reference** into Phase D below. |
+
+**Primary references:** [`requirement.md`](../../requirement.md), [`architecture.md`](architecture.md), [`distributed-future-plan.md`](distributed-future-plan.md), [`milestones.md`](milestones.md), [`client-api.md`](client-api.md), [`data-model.md`](data-model.md), [`test-plan.md`](test-plan.md).
+
+---
+
+## 2. Vision
+
+**MemoryAgent** is a **local-first** assistant that turns **files, saved facts, and (where permitted) system calendars** into **retrieval-augmented answers** on the user’s machine, with **on-device** embeddings and chat by default. Long term, the same product **scales down to a Raspberry Pi class edge index** and **scales out to optional edge nodes and mobile companions**, without forking the mental model: **one Client API**, **clear backend roles**, **explicit degraded behavior**.
+
+---
+
+## 3. Goals (product-wide)
+
+| # | Goal |
+| :--- | :--- |
+| G-1 | **Privacy-by-default:** core chat and memory work without mandatory cloud; user-chosen cloud (e.g. Google Calendar) is **opt-in**. |
+| G-2 | **Trustworthy retrieval:** citations, incremental index, metadata filters, honest “I don’t know” when context is missing. |
+| G-3 | **OS respect:** capabilities (TCC, folder pickers, calendar) are **scoped** and **explained** per [`permissions-matrix.md`](permissions-matrix.md). |
+| G-4 | **One orchestration story:** deployment modes (`standalone`, `host_edge`, `hybrid`, `ios_companion`) share **backend contracts** ([`distributed-future-plan.md`](distributed-future-plan.md)). |
+| G-5 | **Operable:** health, logs, benchmarks, and **admin/debug** paths for support without data recklessness. |
+
+---
+
+## 4. Non-goals (product baseline)
+
+- **No** covert exfiltration of user content; **no** required cloud LLM for default product tier.
+- **No** iMessage / Apple Journal as v1 **baseline** sources ([`requirement.md`](../../requirement.md) §2.1.1).
+- **No** promise of **Google Keep**-class APIs until a supported provider path exists ([`google-calendar-integration.md`](google-calendar-integration.md) out-of-scope note).
+
+---
+
+## 5. Users and scenarios (summary)
+
+| Persona | Needs |
+| :--- | :--- |
+| **Solo knowledge worker** | Watch folders, PDFs/DOCX, chat + memory, optional calendar. |
+| **Power user + edge** | Always-on index on a small home server; chat on laptop ([`distributed-future-plan.md`](distributed-future-plan.md) `host_edge`). |
+| **Hybrid** | Local + remote merge for recall ([`distributed-future-plan.md`](distributed-future-plan.md) `hybrid`). |
+| **Mobile companion** | Read-oriented access to host-backed memory and tools policy ([`distributed-future-plan.md`](distributed-future-plan.md) `ios_companion`). |
+
+---
+
+## 6. Phased product roadmap (detailed)
+
+Phases are **sequenced for risk and dependency**; parallel work is noted where safe. **M*** tags align with [`milestones.md`](milestones.md).
+
+### Phase 0 — Foundation **(shipped)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Scope** | M0–M4 per milestones: repo layout, RAG loop, watcher, mirrors, tools, EventKit calendar read/create/search, REST calendar create, PDF/DOCX + file index DB, metadata filters. |
+| **Acceptance** | Milestone acceptance in [`milestones.md`](milestones.md) and [`test-plan.md`](test-plan.md). |
+| **Docs** | `client-api`, `agent-actions`, `data-model`, `pdf-docx-index-plan` (implemented). |
+
+---
+
+### Phase 1 — Product hardening **(M5)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | NFR measurability, log rotation, packaging / install story, structured errors for ops. |
+| **Deliverables** | Benchmark script + recorded baseline ([`test-plan.md`](test-plan.md) §7 M5); log policy; launchd or signed-app path **decision** documented. |
+| **Dependencies** | Phase 0 stable on reference Mac. |
+| **Acceptance** | Repeatable benchmark artifact; logs bounded by default config; install doc exits 0 on clean VM smoke. |
+| **Risks** | Scope creep into new features—keep M5 **non-functional** unless a blocker forces a small feature. |
+
+---
+
+### Phase 2 — Google Calendar (opt-in) **(product track)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | User **selects** “Include Google Calendar”; OAuth; read path first; **local EventKit + Google** when on, **local only** when off ([`google-calendar-integration.md`](google-calendar-integration.md)). |
+| **Deliverables** | OAuth + token storage policy; `calendar.readonly` scope first; merge reads (sorted, labeled); writes prompt target calendar; soft degrade if Google down; **Disconnect** vs **Include** semantics. |
+| **Dependencies** | Google Cloud project + verification plan for sensitive scopes before broad write. |
+| **Acceptance** | Checklist in calendar spec + integration tests for connect/disconnect/degrade; no Google calls when Include off. |
+| **Parallel** | Can overlap late Phase 1 if staffing allows; must not regress M5 stability. |
+
+---
+
+### Phase 3 — MP1 distributed foundation **(architecture + code)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | Backend interfaces, `deployment_mode`, health **degraded** hints, path to Node API **without** breaking standalone ([`prd-mp1-distributed.md`](prd-mp1-distributed.md), [`mp1-pr1.md`](mp1-pr1.md), [`mp1-pr2.md`](mp1-pr2.md)). |
+| **Deliverables** | **Done:** PR-1 adapters, PR-2 health `deployment` block. **Next:** optional `edge_base_url` config, HTTP Node client stub, `meta.degraded` on chat when remote path selected but unavailable; admin/debug endpoints per [`client-api.md`](client-api.md) when prioritized. |
+| **Dependencies** | [`node-api.md`](node-api.md) contract stable enough to implement client; verification gate [`mp1-verification-checklist.md`](mp1-verification-checklist.md). |
+| **Acceptance** | SRS/PRD MP1 acceptance + test-plan §7.x; standalone default unchanged. |
+| **Note** | MP1 PRD remains the **authoritative MP1** doc; this section only **places** MP1 in the larger roadmap. |
+
+---
+
+### Phase 4 — Distributed operations **(host + edge live)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | **Host ↔ Edge** HTTPS Node API operational: health, index status, retrieve, ingest, control reindex ([`node-api.md`](node-api.md)). |
+| **Deliverables** | Edge service skeleton; TLS + bearer; host adapters for `RetrievalBackend` / `IngestBackend` remote fan-out; hybrid merge policy **implemented**; degraded UX per distributed plan. |
+| **Dependencies** | Phase 3 complete for contracts; ops story for certs and rotation. |
+| **Acceptance** | Integration tests host+edge; failure injection proves soft degrade + user-visible reason; security review checklist. |
+
+---
+
+### Phase 5 — Mobile companion **(iOS / later Android)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | Companion talks **Client API** to host; on-device sources **policy-gated** (files/calendar/journals only where APIs and privacy allow) ([`distributed-future-plan.md`](distributed-future-plan.md) mobile constraints). |
+| **Deliverables** | Thin client; auth; offline/cache strategy **documented**; optional Apple **Foundation Models** where product chooses local inference on phone. |
+| **Dependencies** | Phase 4 or strict standalone+host URL for demos. |
+| **Acceptance** | Defined in a future mobile PRD/SRS; trace to Client API stability. |
+
+---
+
+### Phase 6 — Ingestion and format expansion **(V-next)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | Tabular, slides, mail export, OCR, etc., without breaking index semantics ([`document-format-vnext-plan.md`](document-format-vnext-plan.md)). |
+| **Deliverables** | Phases **E–H** in that document (CSV/XLSX → PPTX → email → OCR → legacy office → HTML). |
+| **Dependencies** | Parser deps, disk/CPU budgets (incl. Pi profile in same doc). |
+| **Acceptance** | Per-format test-plan rows + ingest_stats / file_index compatibility. |
+
+---
+
+### Phase 7 — OS depth and native shell **(optional product)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | Reminders read (if feasible), Notes automation **if** prioritized, menu bar / hotkey ([`milestones.md`](milestones.md) Optional). |
+| **Deliverables** | Bridge or automation per [`permissions-matrix.md`](permissions-matrix.md); native shell acceptance from milestones. |
+| **Dependencies** | Apple permission landscape; no regression on Phase 0–3 core. |
+| **Acceptance** | Milestone optional sections + manual MT procedures. |
+
+---
+
+### Phase 8 — Enterprise and hardening **(future)**
+
+| Item | Detail |
+| :--- | :--- |
+| **Goals** | mTLS, SSO, org policies, audit exports, multi-user—**only if** product enters that market. |
+| **Deliverables** | TBD; architecture already **mTLS-ready** in narrative. |
+| **Dependencies** | Phases 3–4 stable. |
+| **Acceptance** | Separate PRD when initiated. |
+
+---
+
+## 7. Roadmap diagram (high level)
+
+```mermaid
+flowchart LR
+  P0[Phase 0 Foundation M0-M4]
+  P1[Phase 1 M5 Hardening]
+  P2[Phase 2 Google Calendar]
+  P3[Phase 3 MP1 Code]
+  P4[Phase 4 Edge Live]
+  P5[Phase 5 Mobile]
+  P6[Phase 6 Formats V-next]
+  P7[Phase 7 OS depth optional]
+  P0 --> P1
+  P1 --> P3
+  P2 -.-> P1
+  P3 --> P4
+  P4 --> P5
+  P1 --> P6
+  P3 -.-> P6
+  P1 --> P7
+```
+
+*(Phase 2 can start after Phase 1 stabilizes; Phase 6 can partially parallelize from Phase 1 onward with format ownership.)*
+
+---
+
+## 8. Success metrics (rolling)
+
+| Metric | Target owner |
+| :--- | :--- |
+| Time to first token (warm/cold) | M5 benchmark doc |
+| Idle observation CPU | NFR in requirement |
+| Index freshness SLA | M2 + ops runbook |
+| OAuth / calendar error rate | Phase 2 dashboard or logs |
+| Degraded-mode clarity | User study + structured log review (Phase 4) |
+
+---
+
+## 9. Review and change control
+
+- **Quarterly** (or per release): reconcile this PRD with [`milestones.md`](milestones.md) checkboxes and [`distributed-future-plan.md`](distributed-future-plan.md) decision hooks.
+- **Any** new externally visible API: update [`client-api.md`](client-api.md) / [`node-api.md`](node-api.md) in the same release train.
+
+---
+
+## 10. Traceability
+
+| Topic | Document |
+| :--- | :--- |
+| MP1 only | [`prd-mp1-distributed.md`](prd-mp1-distributed.md) |
+| SRS MP1 | [`srs-mp1-distributed.md`](srs-mp1-distributed.md) |
+| Calendar opt-in | [`google-calendar-integration.md`](google-calendar-integration.md) |
+| Topology & modes | [`distributed-future-plan.md`](distributed-future-plan.md) |
+| Delivery checklists | [`milestones.md`](milestones.md), [`test-plan.md`](test-plan.md) |
