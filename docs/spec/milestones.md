@@ -53,7 +53,7 @@ Phases assume **web UI + local API** as the primary product surface ([`architect
 
 - [ ] NFR-1 / NFR-2 measurement scripts and documented hardware baseline (Apple Silicon reference machine)
 - [ ] Log rotation, structured errors
-- [ ] Packaging: signed app or documented launchd setup (choose distribution model)
+- [x] Packaging / distribution model — **decision recorded** ([`m5-packaging-decision.md`](m5-packaging-decision.md)): **no product bundle** now (documented README + `scripts/`); **signed macOS .app** may follow after substantive product work; optional **`launchd`** doc later if desired
 
 **Acceptance:** Repeatable benchmark doc; no unbounded log growth in default config.
 

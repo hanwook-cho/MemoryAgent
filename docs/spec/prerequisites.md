@@ -89,7 +89,7 @@ Any tool that must be **installed or configured** before developers can run test
 1. **One-shot:** A new engineer follows **one** primary command (plus documented env vars) without hunting separate install pages for routine deps.
 2. **Safe to re-run:** Scripts use `set -euo pipefail` (or equivalent) and skip redundant work where possible.
 3. **Honest failures:** If **Ollama** is not running, the script prints exact **follow-up commands** (e.g. `ollama pull …`) instead of failing silently.
-4. **End-user packaging** (signed `.app`, `launchd`) may use a **different** installer; `setup-dev.sh` targets **developers** and manual QA machines.
+4. **End-user packaging** (signed `.app`, optional `launchd`) is **deferred** until after substantive product development; see [`m5-packaging-decision.md`](m5-packaging-decision.md). **`setup-dev.sh`** targets **developers** and manual QA machines for the current stage.
 
 **Environment variables** (defaults match common Ollama model names; adjust when the implementation pins versions):
 

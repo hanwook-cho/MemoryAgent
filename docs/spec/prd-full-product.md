@@ -68,9 +68,9 @@ Phases are **sequenced for risk and dependency**; parallel work is noted where s
 | Item | Detail |
 | :--- | :--- |
 | **Goals** | NFR measurability, log rotation, packaging / install story, structured errors for ops. |
-| **Deliverables** | Benchmark script + recorded baseline ([`test-plan.md`](test-plan.md) §7 M5); log policy; launchd or signed-app path **decision** documented. |
+| **Deliverables** | Benchmark script + recorded baseline ([`test-plan.md`](test-plan.md) §7 M5); log policy; **packaging decision** documented ([`m5-packaging-decision.md`](m5-packaging-decision.md)): **no product bundle** at this stage (README + scripts); **signed .app** candidate after core dev complete; optional `launchd` later only if needed. |
 | **Dependencies** | Phase 0 stable on reference Mac. |
-| **Acceptance** | Repeatable benchmark artifact; logs bounded by default config; install doc exits 0 on clean VM smoke. |
+| **Acceptance** | Repeatable benchmark artifact; logs bounded by default config; **documented** install (source + scripts) exits 0 on clean-environment smoke per [`test-plan.md`](test-plan.md) MT-M5-04; retail PKG/DMG not required until a later release adopts signed app. |
 | **Risks** | Scope creep into new features—keep M5 **non-functional** unless a blocker forces a small feature. |
 
 ---

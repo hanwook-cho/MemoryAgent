@@ -320,7 +320,7 @@ Use when there is no Settings UI yet: `<BASE>` and `<TOKEN>` as in the table abo
 
 #### MT-M5-04 — Clean install smoke (packaging)
 
-1. On a **fresh user account** or VM, follow the **shipping install** doc only (no dev shortcuts).
+1. On a **fresh user account** or VM, follow the **authoritative install path** for the current release. Until a retail bundle exists, this is the **documented source + scripts** flow in repository `README.md` and [`prerequisites.md`](prerequisites.md) §7 (see [`m5-packaging-decision.md`](m5-packaging-decision.md)).
 2. Start the app; complete first-run; send one chat message.
 3. **Expected:** No crash; health OK.
 
