@@ -51,7 +51,7 @@ Phases assume **web UI + local API** as the primary product surface ([`architect
 
 ## M5 — Product hardening
 
-- [ ] NFR-1 / NFR-2 measurement scripts and documented hardware baseline (Apple Silicon reference machine)
+- [x] NFR-1 / NFR-2 — **verified** (repeatable [`scripts/benchmark_m5.py`](../../scripts/benchmark_m5.py), baseline [`docs/benchmarks/m5-latest.md`](../benchmarks/m5-latest.md); Apple Silicon + OS in report; **NFR-2** within cap in artifact; **NFR-1** baselined for M5 per product review **2026-04-23**)
 - [ ] Log rotation, structured errors
 - [x] Packaging / distribution model — **decision recorded** ([`m5-packaging-decision.md`](m5-packaging-decision.md)): **no product bundle** now (documented README + `scripts/`); **signed macOS .app** may follow after substantive product work; optional **`launchd`** doc later if desired
 

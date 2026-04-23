@@ -31,3 +31,7 @@
 
 - Run this multiple times and compare cold vs warm behavior on the same machine.
 - Keep Ollama model, system load, and background apps consistent across runs.
+
+## M5 verification
+
+**2026-04-23:** NFR-1/NFR-2 **accepted for the M5 gate** — **NFR-2** (idle CPU) satisfied by the samples above; **NFR-1** (time to first token) **baselined** via this report and [`scripts/benchmark_m5.py`](../../scripts/benchmark_m5.py). Reference hardware is **Apple Silicon** as summarized in the **Machine** line ([`requirement.md`](../../requirement.md) §3.1, [`docs/spec/milestones.md`](../spec/milestones.md) M5).
