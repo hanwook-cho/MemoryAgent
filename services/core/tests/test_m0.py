@@ -33,6 +33,10 @@ def test_health_ok(client: TestClient) -> None:
     body = r.json()
     assert body["status"] == "ok"
     assert body["version"] == "0.1.0"
+    dep = body["deployment"]
+    assert dep["mode"] == "standalone"
+    assert dep["degraded"] is False
+    assert dep["degraded_reason"] is None
     assert body["llm"]["backend"] == "ollama"
     assert body["llm"]["reachable"] is False
     idx = body["index"]

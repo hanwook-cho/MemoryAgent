@@ -29,6 +29,11 @@ Response `200`:
 {
   "status": "ok",
   "version": "0.1.0",
+  "deployment": {
+    "mode": "standalone",
+    "degraded": false,
+    "degraded_reason": null
+  },
   "llm": {
     "backend": "ollama",
     "reachable": true,
@@ -37,6 +42,8 @@ Response `200`:
   "index": { "documents": 42, "chunks": 1204 }
 }
 ```
+
+- **`deployment`:** reflects `deployment_mode` from config (see `GET/PATCH /config`). When the mode is not `standalone`, **`degraded`** is **`true`** until remote retrieval/ingest is implemented; **`degraded_reason`** is a short machine-oriented explanation for clients to surface in UI or logs.
 
 `backend` identifies the runtime in use (e.g. `ollama`, `mlx_lm` / `mlx-lm`, `llamacpp`).
 
