@@ -55,6 +55,7 @@ class ConfigPatchRequest(BaseModel):
     watched_roots: list[str] | None = None
     watch_ignore_globs: list[str] | None = None
     watch_debounce_seconds: float | None = Field(default=None, ge=0.1, le=3600.0)
+    deployment_mode: str | None = None
 
 
 MirrorId = Literal["user", "soul"]

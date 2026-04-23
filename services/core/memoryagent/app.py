@@ -17,7 +17,8 @@ from fastapi.staticfiles import StaticFiles
 
 from memoryagent import __version__
 from memoryagent.auth_http import BearerChecker
-from memoryagent.config_store import load_config, save_config
+from memoryagent.backends import build_local_backends
+from memoryagent.config_store import KNOWN_DEPLOYMENT_MODES, load_config, save_config
 from memoryagent.embeddings import DeterministicEmbedder, Embedder, OllamaEmbedder
 from memoryagent.folder_picker import pick_folder_macos
 from memoryagent.llm_client import FakeLlm, LlmClient, OllamaLlm
@@ -83,6 +84,10 @@ def create_app(
     else:
         rag = rag_service
 
+    backends = build_local_backends(rag)
+    retrieval = backends.retrieval
+    ingest = backends.ingest
+
     watcher: FileWatcher | NullFileWatcher = (
         file_watcher if file_watcher is not None else FileWatcher(data_dir=data_dir, rag=rag)
     )
@@ -102,7 +107,7 @@ def create_app(
         for mid in MIRROR_FILES:
             mp = ensure_mirror_file(data_dir, mid)
             try:
-                await rag.ingest_mirror_document(mp, mirror_key=mid)
+                await ingest.ingest_mirror_document(mp, mirror_key=mid)
             except Exception:
                 logger.exception("mirror ingest at startup failed for %s", mid)
         yield
@@ -116,12 +121,13 @@ def create_app(
         redoc_url=f"{API_PREFIX}/redoc",
         lifespan=lifespan,
     )
+    app.state.mp1_backends = backends
 
     @app.get(f"{API_PREFIX}/health")
     async def health() -> dict[str, Any]:
         c = load_config(data_dir)
         reachable = await ollama_reachable(c.ollama_base_url)
-        stats = rag.index_stats()
+        stats = retrieval.index_stats()
         return {
             "status": "ok",
             "version": __version__,
@@ -151,6 +157,7 @@ def create_app(
             "watched_roots": list(c.watched_roots),
             "watch_ignore_globs": list(c.watch_ignore_globs),
             "watch_debounce_seconds": c.watch_debounce_seconds,
+            "deployment_mode": c.deployment_mode,
             "ui": {
                 "chat_welcome_dismissed": False,
                 "chat_welcome_version": "3",
@@ -178,6 +185,21 @@ def create_app(
             c.watch_ignore_globs = list(body.watch_ignore_globs)
         if body.watch_debounce_seconds is not None:
             c.watch_debounce_seconds = float(body.watch_debounce_seconds)
+        if body.deployment_mode is not None:
+            if body.deployment_mode not in KNOWN_DEPLOYMENT_MODES:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": {
+                            "code": "VALIDATION",
+                            "message": (
+                                f"Invalid deployment_mode: {body.deployment_mode!r}. "
+                                f"Expected one of: {sorted(KNOWN_DEPLOYMENT_MODES)}."
+                            ),
+                        }
+                    },
+                )
+            c.deployment_mode = body.deployment_mode
         save_config(data_dir, c)
         watcher.restart(asyncio.get_running_loop(), load_config(data_dir))
         return await get_config()
@@ -250,7 +272,7 @@ def create_app(
             ) from e
         path.write_text(body.content, encoding="utf-8")
         try:
-            doc_id = await rag.ingest_mirror_document(path, mirror_key=mirror_id)
+            doc_id = await ingest.ingest_mirror_document(path, mirror_key=mirror_id)
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
@@ -350,7 +372,7 @@ def create_app(
     @router.post("/memory/entries", status_code=201)
     async def post_memory(body: MemoryEntryRequest) -> MemoryEntryResponse:
         try:
-            doc_id, job_id = await rag.ingest_memory(
+            doc_id, job_id = await ingest.ingest_memory(
                 body.text,
                 tags=body.tags,
                 source=body.source,
@@ -388,7 +410,7 @@ def create_app(
                 if indexed_before
                 else None
             )
-            results = await rag.search(
+            results = await retrieval.search(
                 q,
                 limit=limit,
                 filters=SearchFilters(
