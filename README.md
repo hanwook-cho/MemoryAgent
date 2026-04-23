@@ -6,7 +6,7 @@
 
 Planned **distributed / MP1** work (multi-host, optional edge node, Client vs Node API), **PRD/SRS**, verification checklists, **Google Calendar** integration rules, and milestone tests all live under **[`docs/spec/README.md`](docs/spec/README.md)** (indexed table—not “local app only”). The **full-product phased roadmap** is in **[`docs/spec/prd-full-product.md`](docs/spec/prd-full-product.md)**; **software requirements (SHALL)** across phases are in **[`docs/spec/srs-full-product.md`](docs/spec/srs-full-product.md)**. **[`docs/spec/prd-mp1-distributed.md`](docs/spec/prd-mp1-distributed.md)** / **[`docs/spec/srs-mp1-distributed.md`](docs/spec/srs-mp1-distributed.md)** scope **MP1 only**.
 
-**On GitHub:** the repository **front page** shows the **default** branch (`main`). That branch can **lag** behind integration work. To read the same **README** and **spec tree** as current development, use the branch menu and select **`ma-dist`**, or merge **`ma-dist` → `main`** when you want the default view to catch up (see open PRs).
+**On GitHub:** the **front page** follows the **default** branch (`main`). **`main` is not continuously merged from `ma-dist`**—promotion happens only when **`ma-dist` is fully complete** for a release milestone ([`CONTRIBUTING.md`](CONTRIBUTING.md)). For the latest integration **README** and **`docs/spec/`**, select branch **`ma-dist`** in the branch menu.
 
 ## Stack (M4)
 

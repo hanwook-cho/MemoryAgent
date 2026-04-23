@@ -6,13 +6,25 @@
 
 **`ma-dist` is not macOS-only.** The name reflects **MemoryAgent + distributed** integration, not “Macintosh exclusive.” Cross-platform **host** work, shared core, and documentation land here too; mac-specific behavior (for example EventKit) lives behind **adapters** per [`docs/spec/architecture.md`](docs/spec/architecture.md).
 
-- When creating a PR on GitHub, set **base** to **`ma-dist`** (not `main`), unless you are explicitly doing a release promotion that the maintainers agreed to target `main`.
+- When creating a PR on GitHub, set **base** to **`ma-dist`** (not `main`).
 
 From the CLI (example):
 
 ```bash
 gh pr create --base ma-dist --head your-feature-branch
 ```
+
+## `main` branch policy
+
+**`ma-dist` → `main` merges are gated:** do **not** merge **`ma-dist` into `main`** until **`ma-dist` is fully complete** for the agreed promotion milestone (feature set, docs, and checks the maintainers define for that release).
+
+Until then:
+
+- Treat **`ma-dist`** as the **source of truth** for ongoing integration.
+- Treat **`main`** as a **stable snapshot** line; it may **lag** `ma-dist` on purpose.
+- On **GitHub**, use the branch selector (**`ma-dist`**) to browse the latest **README** and **`docs/spec/`** tree.
+
+When `ma-dist` **is** ready for promotion, merge to **`main`** in a deliberate step (pull request or controlled merge) and document what “complete” meant for that promotion.
 
 ## Checks
 
