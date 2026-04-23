@@ -127,6 +127,7 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 | Fallback | **Unit:** remote returns `None` → local Chroma hits | — |
 | `hybrid` merge | **Unit:** local + remote merged by best score per `chunk_id` | — |
 | Chat RAG path | **Integration:** existing chat tests with `bind_retrieval_for_chat` | — |
+| Remote memory ingest | **Integration:** `POST /memory/entries` with `host_edge` + mocked `try_node_ingest_memory` (`tests/test_mp1_remote_retrieve.py`) | Real edge |
 
 **Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py) green.
 

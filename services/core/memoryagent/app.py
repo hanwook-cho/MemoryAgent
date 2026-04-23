@@ -192,7 +192,7 @@ def create_app(
 
     @router.patch("/config")
     async def patch_config(body: ConfigPatchRequest) -> dict[str, Any]:
-        nonlocal retrieval, backends
+        nonlocal retrieval, backends, ingest
         c = load_config(data_dir)
         if body.watched_roots is not None:
             for raw in body.watched_roots:
@@ -233,6 +233,7 @@ def create_app(
         if body.deployment_mode is not None or body.edge_base_url is not None:
             backends = build_runtime_backends(rag, c, bearer_token=bearer_token)
             retrieval = backends.retrieval
+            ingest = backends.ingest
             rag.bind_retrieval_for_chat(retrieval)
             app.state.mp1_backends = backends
         watcher.restart(asyncio.get_running_loop(), load_config(data_dir))

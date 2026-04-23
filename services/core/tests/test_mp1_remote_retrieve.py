@@ -10,8 +10,11 @@ from fastapi.testclient import TestClient
 
 from memoryagent.app import create_app
 from memoryagent.backends import (
+    HostEdgeIngestBackend,
     HostEdgeRetrievalBackend,
+    HybridIngestBackend,
     HybridRetrievalBackend,
+    LocalRagIngestBackend,
     LocalRagRetrievalBackend,
     build_runtime_backends,
 )
@@ -219,6 +222,103 @@ def test_memory_search_host_edge_remote_hit(data_dir: Path, monkeypatch: pytest.
     assert hits[0]["snippet"] == "edge-snippet-xyz"
 
 
+async def test_host_edge_ingest_pushes_memory_after_local(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="x"),
+    )
+    pushed: list[tuple[str, tuple[str, ...], str]] = []
+
+    async def fake_ingest(
+        edge_base_url: str,
+        bearer_token: str,
+        *,
+        text: str,
+        tags: list[str],
+        source: str,
+        timeout_seconds: float = 30.0,
+    ) -> bool:
+        _ = edge_base_url, bearer_token, timeout_seconds
+        pushed.append((text, tuple(tags), source))
+        return True
+
+    import memoryagent.backends as backends_mod
+
+    monkeypatch.setattr(backends_mod, "try_node_ingest_memory", fake_ingest)
+    be = HostEdgeIngestBackend(rag, "http://127.0.0.1:9", "tok")
+    doc_id, job_id = await be.ingest_memory("ingest-line", tags=["a"], source="pytest")
+    assert doc_id and job_id
+    assert pushed == [("ingest-line", ("a",), "pytest")]
+
+
+def test_post_memory_host_edge_calls_remote_ingest(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import memoryagent.app as app_mod
+
+    async def fake_ollama(_: str) -> bool:
+        return False
+
+    monkeypatch.setattr(app_mod, "ollama_reachable", fake_ollama)
+
+    pushed: list[str] = []
+
+    async def fake_ingest(
+        edge_base_url: str,
+        bearer_token: str,
+        *,
+        text: str,
+        tags: list[str],
+        source: str,
+        timeout_seconds: float = 30.0,
+    ) -> bool:
+        _ = edge_base_url, bearer_token, tags, timeout_seconds
+        pushed.append(text)
+        return True
+
+    import memoryagent.backends as backends_mod
+
+    monkeypatch.setattr(backends_mod, "try_node_ingest_memory", fake_ingest)
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+    )
+    empty = data_dir / "no_web_ingest"
+    empty.mkdir()
+    app = create_app(
+        data_dir=data_dir,
+        static_dir=empty,
+        rag_service=rag,
+        file_watcher=NullFileWatcher(),
+    )
+    client = TestClient(app)
+    h = _auth(data_dir)
+    client.patch(
+        "/api/v1/config",
+        headers=h,
+        json={
+            "deployment_mode": "host_edge",
+            "edge_base_url": "https://mock-edge.local",
+        },
+    )
+    r = client.post(
+        "/api/v1/memory/entries",
+        headers=h,
+        json={"text": "remote-ingest-body", "tags": ["t"], "source": "api"},
+    )
+    assert r.status_code == 201
+    assert pushed == ["remote-ingest-body"]
+
+
 def test_build_runtime_backends_host_edge_class(data_dir: Path) -> None:
     chroma_dir = data_dir / "store" / "vector" / "chroma"
     rag = RagService(
@@ -230,6 +330,7 @@ def test_build_runtime_backends_host_edge_class(data_dir: Path) -> None:
     cfg = replace(AppConfig(), deployment_mode="host_edge", edge_base_url="http://127.0.0.1:1")
     b = build_runtime_backends(rag, cfg, bearer_token="abc")
     assert isinstance(b.retrieval, HostEdgeRetrievalBackend)
+    assert isinstance(b.ingest, HostEdgeIngestBackend)
 
 
 def test_build_runtime_backends_hybrid_class(data_dir: Path) -> None:
@@ -243,6 +344,7 @@ def test_build_runtime_backends_hybrid_class(data_dir: Path) -> None:
     cfg = replace(AppConfig(), deployment_mode="hybrid", edge_base_url="http://127.0.0.1:1")
     b = build_runtime_backends(rag, cfg, bearer_token="abc")
     assert isinstance(b.retrieval, HybridRetrievalBackend)
+    assert isinstance(b.ingest, HybridIngestBackend)
 
 
 def test_build_runtime_backends_standalone_is_local(data_dir: Path) -> None:
@@ -260,3 +362,4 @@ def test_build_runtime_backends_standalone_is_local(data_dir: Path) -> None:
     )
     b = build_runtime_backends(rag, cfg, bearer_token="abc")
     assert isinstance(b.retrieval, LocalRagRetrievalBackend)
+    assert isinstance(b.ingest, LocalRagIngestBackend)

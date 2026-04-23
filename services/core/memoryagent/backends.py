@@ -10,6 +10,7 @@ from typing import Protocol, runtime_checkable
 from memoryagent.config_store import AppConfig
 from memoryagent.llm_client import LlmClient
 from memoryagent.rag_service import RagService, SearchFilters
+from memoryagent.remote_ingest import try_node_ingest_memory
 from memoryagent.remote_retrieval import try_node_retrieve
 from memoryagent.schemas import ChatMessage, SearchResultItem
 
@@ -50,7 +51,7 @@ LlmBackend = LlmClient
 
 @dataclass(frozen=True, slots=True)
 class RuntimeBackends:
-    """Concrete backends for the current process (PR-1: all local)."""
+    """Concrete backends for the current process (PR-1 + remote ingest fan-out)."""
 
     retrieval: RetrievalBackend
     ingest: IngestBackend
@@ -180,6 +181,47 @@ class LocalRagIngestBackend:
         return await self._rag.ingest_mirror_document(path, mirror_key=mirror_key)
 
 
+class HostEdgeIngestBackend:
+    """
+    Local ingest remains authoritative for ``document_id`` / host index.
+
+    After a successful local ``ingest_memory``, best-effort ``POST /ingest`` to the edge
+    (Node paths differ for ``kind=file``; file/mirror stays host-local for this MVP).
+    """
+
+    __slots__ = ("_rag", "_edge_base_url", "_bearer_token")
+
+    def __init__(self, rag: RagService, edge_base_url: str, bearer_token: str) -> None:
+        self._rag = rag
+        self._edge_base_url = edge_base_url.rstrip("/")
+        self._bearer_token = bearer_token
+
+    async def ingest_memory(
+        self, text: str, *, tags: list[str], source: str
+    ) -> tuple[str, str]:
+        doc_id, job_id = await self._rag.ingest_memory(text, tags=tags, source=source)
+        await try_node_ingest_memory(
+            self._edge_base_url,
+            self._bearer_token,
+            text=text,
+            tags=tags,
+            source=source,
+        )
+        return doc_id, job_id
+
+    async def ingest_file_path(self, path: Path) -> str:
+        return await self._rag.ingest_file_path(path)
+
+    async def ingest_mirror_document(self, path: Path, *, mirror_key: str) -> str:
+        return await self._rag.ingest_mirror_document(path, mirror_key=mirror_key)
+
+
+class HybridIngestBackend(HostEdgeIngestBackend):
+    """Same memory fan-out as ``HostEdgeIngestBackend`` until hybrid-specific rules exist."""
+
+    pass
+
+
 class LocalLlmBackendAdapter:
     """Thin delegate so call sites can depend on ``LlmBackend`` without touching ``RagService``."""
 
@@ -216,9 +258,19 @@ def build_runtime_backends(
     else:
         retrieval = local_retrieval
 
+    local_ingest: IngestBackend = LocalRagIngestBackend(rag)
+    if edge and mode == "host_edge":
+        ingest: IngestBackend = HostEdgeIngestBackend(rag, edge, bearer_token)
+    elif edge and mode == "hybrid":
+        ingest = HybridIngestBackend(rag, edge, bearer_token)
+    elif edge and mode in ("ios_companion",):
+        ingest = HostEdgeIngestBackend(rag, edge, bearer_token)
+    else:
+        ingest = local_ingest
+
     return RuntimeBackends(
         retrieval=retrieval,
-        ingest=LocalRagIngestBackend(rag),
+        ingest=ingest,
         llm=LocalLlmBackendAdapter(rag.llm_client),
     )
 
