@@ -83,7 +83,7 @@ Phases are **sequenced for risk and dependency**; parallel work is noted where s
 | **Deliverables** | OAuth + token storage policy; `calendar.readonly` scope first; merge reads (sorted, labeled); writes prompt target calendar; soft degrade if Google down; **Disconnect** vs **Include** semantics. |
 | **Dependencies** | Google Cloud project + verification plan for sensitive scopes before broad write. |
 | **Acceptance** | Checklist in calendar spec + integration tests for connect/disconnect/degrade; no Google calls when Include off. |
-| **Parallel** | Can overlap late Phase 1 if staffing allows; must not regress M5 stability. |
+| **Parallel** | Can overlap late Phase 1 if staffing allows; must not regress M5 stability. **Repository sequencing:** **MP1 Phase 3 “Next”** (below) is completed **before** Phase 2 Google Calendar **implementation** unless revised by PR. |
 
 ---
 
@@ -96,6 +96,7 @@ Phases are **sequenced for risk and dependency**; parallel work is noted where s
 | **Dependencies** | [`node-api.md`](node-api.md) contract stable enough to implement client; verification gate [`mp1-verification-checklist.md`](mp1-verification-checklist.md). |
 | **Acceptance** | SRS/PRD MP1 acceptance + test-plan §7.x; standalone default unchanged. |
 | **Note** | MP1 PRD remains the **authoritative MP1** doc; this section only **places** MP1 in the larger roadmap. |
+| **Repo sequencing** | **First** post-M5 engineering track for this repository: close the **Next** deliverables in this section, **then** start Phase 2 Google Calendar **code** ([`google-calendar-integration.md`](google-calendar-integration.md)). |
 
 ---
 
