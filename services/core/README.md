@@ -41,3 +41,4 @@ Core memory/chat routes (`POST /api/v1/memory/entries`, `POST /api/v1/chat`, `GE
 - Optional env overrides:
   - `MEMORYAGENT_LOG_MAX_BYTES`
   - `MEMORYAGENT_LOG_BACKUP_COUNT`
+- **Tests:** `pytest tests/test_m5_logging.py` (rotation); `pytest tests/test_m5_structured_errors.py` (HTTP `detail.error.code` / `message` for tool, calendar, memory, chat, and chat-stream paths).

@@ -75,7 +75,8 @@ This document maps **each milestone** in [`milestones.md`](milestones.md) to **w
 | Goal | Automated | Manual / smoke |
 | :--- | :--- | :--- |
 | NFR-1 / NFR-2 | **Scripted:** measure cold/warm time to first token, idle CPU (document hardware in [`prerequisites.md`](prerequisites.md)) | Compare on reference Mac |
-| Logs | **Integration:** rotation/truncate after N MB | Inspect files |
+| Logs | **Integration:** rotation/truncate after N MB (`tests/test_m5_logging.py`) | Inspect files |
+| Structured API errors | **Integration:** `tests/test_m5_structured_errors.py` asserts `detail.error` for `VALIDATION`, `PERMISSION_DENIED`, `MODEL_UNAVAILABLE` (incl. SSE `event: error` on `/chat/stream`) | Spot-check new routes in OpenAPI |
 | Packaging / launchd | **Smoke:** install script exits 0; service starts | User installs on clean VM |
 | Admin/Debug controls | **Integration:** restricted endpoints enforce auth/confirmation; `cold-start`/`reset-index` behavior and audit logs verified | Manual destructive-operation confirmation UX |
 
