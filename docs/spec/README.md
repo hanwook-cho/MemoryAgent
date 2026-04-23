@@ -1,12 +1,15 @@
 # MemoryAgent — detailed specification (index)
 
-This folder expands the high-level [`requirement.md`](../../requirement.md) into implementable contracts. **OS integration order** (files → EventKit calendar/reminders → optional Notes; defer Mail/IMAP pattern; no iMessage/Journal baseline) is defined in **requirement §2.1.1**. Read in this order:
+This folder expands the high-level [`requirement.md`](../../requirement.md) into implementable contracts. **Development:** open PRs against **`ma-dist`** (see [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)). **OS integration order** (files → EventKit calendar/reminders → optional Notes; defer Mail/IMAP pattern; no iMessage/Journal baseline) is defined in **requirement §2.1.1**. Read in this order:
 
 | Document | Contents |
 | :--- | :--- |
 | [`architecture.md`](architecture.md) | Processes, components, data flow, web app vs native helper |
+| [`prd-mp1-distributed.md`](prd-mp1-distributed.md) | Clean product requirements document for MP1 distributed architecture foundation |
+| [`srs-mp1-distributed.md`](srs-mp1-distributed.md) | Software requirements specification for MP1 distributed architecture foundation |
 | [`data-model.md`](data-model.md) | Memory records, chunks, embeddings, Markdown sync |
 | [`client-api.md`](client-api.md) | Client API (HTTP/WebSocket) for web, desktop, and mobile clients |
+| [`node-api.md`](node-api.md) | Node API (HTTP/HTTPS) for Host Backend ↔ Edge Node control/retrieval/ingest |
 | [`agent-actions.md`](agent-actions.md) | Chat-triggered **save to memory** and **create calendar event** |
 | [`onboarding.md`](onboarding.md) | First-run chat welcome copy, dismissal, client persistence |
 | [`permissions-matrix.md`](permissions-matrix.md) | macOS capabilities, when to ask, fallbacks |

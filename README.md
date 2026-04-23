@@ -2,6 +2,8 @@
 
 Local-first memory assistant for macOS — see [`requirement.md`](requirement.md) and [`docs/spec/`](docs/spec/README.md).
 
+**Pull requests:** target the **`ma-dist`** branch by default (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+
 ## Stack (M4)
 
 - **Vector DB:** [Chroma](https://www.trychroma.com/) (persistent under `MEMORYAGENT_DATA_DIR/store/vector/chroma`).
