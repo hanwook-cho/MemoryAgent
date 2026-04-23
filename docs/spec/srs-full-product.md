@@ -198,3 +198,4 @@ Implementation releases **SHALL** maintain traceability: for each **SR-P** / **N
 | [`srs-mp1-distributed.md`](srs-mp1-distributed.md) | **Subset** SRS for MP1 — **normative** where SR-P3-0 applies |
 | [`prd-mp1-distributed.md`](prd-mp1-distributed.md) | MP1 PRD — refines Phase 3 |
 | [`requirement.md`](../../requirement.md) | Original SRS-style requirements — **SHALL** be satisfied where not superseded by later explicit clauses |
+| [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) | **GO** artifact before promoting **`ma-dist` → `main`** |

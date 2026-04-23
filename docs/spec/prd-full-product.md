@@ -196,6 +196,7 @@ flowchart LR
 
 - **Quarterly** (or per release): reconcile this PRD with [`milestones.md`](milestones.md) checkboxes and [`distributed-future-plan.md`](distributed-future-plan.md) decision hooks.
 - **Any** new externally visible API: update [`client-api.md`](client-api.md) / [`node-api.md`](node-api.md) in the same release train.
+- **Promotion to `main`:** use [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) when merging **`ma-dist` → `main`** per [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
 ---
 
@@ -209,3 +210,4 @@ flowchart LR
 | Calendar opt-in | [`google-calendar-integration.md`](google-calendar-integration.md) |
 | Topology & modes | [`distributed-future-plan.md`](distributed-future-plan.md) |
 | Delivery checklists | [`milestones.md`](milestones.md), [`test-plan.md`](test-plan.md) |
+| `ma-dist` → `main` promotion | [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) |

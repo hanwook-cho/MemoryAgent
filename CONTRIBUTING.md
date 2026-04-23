@@ -24,7 +24,7 @@ Until then:
 - Treat **`main`** as a **stable snapshot** line; it may **lag** `ma-dist` on purpose.
 - On **GitHub**, use the branch selector (**`ma-dist`**) to browse the latest **README** and **`docs/spec/`** tree.
 
-When `ma-dist` **is** ready for promotion, merge to **`main`** in a deliberate step (pull request or controlled merge) and document what “complete” meant for that promotion.
+When `ma-dist` **is** ready for promotion, complete **[`docs/spec/ma-dist-promotion-checklist.md`](docs/spec/ma-dist-promotion-checklist.md)**, then merge to **`main`** in a deliberate step (pull request or controlled merge) and record the promotion in **§0** of that checklist.
 
 ## Checks
 

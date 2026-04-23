@@ -340,6 +340,7 @@ Use when there is no Settings UI yet: `<BASE>` and `<TOKEN>` as in the table abo
 
 - [`prd-full-product.md`](prd-full-product.md) — full-product phased roadmap
 - [`srs-full-product.md`](srs-full-product.md) — full-product SHALL requirements and verification matrix
+- [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) — merge `ma-dist` → `main` when integration complete
 - [`milestones.md`](milestones.md) — acceptance themes
 - [`client-api.md`](client-api.md) — contract under test
 - [`agent-actions.md`](agent-actions.md) — tool behaviors to cover in M4
