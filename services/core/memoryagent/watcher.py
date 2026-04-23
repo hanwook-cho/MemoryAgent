@@ -16,7 +16,7 @@ from memoryagent.rag_service import RagService
 
 logger = logging.getLogger(__name__)
 
-_FILE_SUFFIXES = {".md", ".txt"}
+_FILE_SUFFIXES = {".md", ".txt", ".pdf", ".docx"}
 
 
 def path_matches_ignore(rel_posix: str, spec: GitIgnoreSpec | None) -> bool:
@@ -29,6 +29,26 @@ def build_ignore_spec(patterns: list[str]) -> GitIgnoreSpec | None:
     if not patterns:
         return None
     return GitIgnoreSpec.from_lines(patterns)
+
+
+def collect_supported_files(root: Path, ignore_spec: GitIgnoreSpec | None) -> list[Path]:
+    """Return existing supported files under root honoring ignore globs."""
+    resolved = root.resolve()
+    out: list[Path] = []
+    for p in resolved.rglob("*"):
+        if not p.is_file():
+            continue
+        try:
+            rel = p.relative_to(resolved).as_posix()
+        except ValueError:
+            continue
+        if path_matches_ignore(rel, ignore_spec):
+            continue
+        if p.suffix.lower() not in _FILE_SUFFIXES:
+            continue
+        out.append(p)
+    out.sort()
+    return out
 
 
 class _EnqueueHandler(FileSystemEventHandler):
@@ -155,6 +175,11 @@ class FileWatcher:
                     queue_full_log="watch queue full; dropping event",
                 )
                 self._observer.schedule(h, str(root.resolve()), recursive=True)
+                for p in collect_supported_files(root, self._ignore_spec):
+                    try:
+                        self._raw_q.put_nowait(p)
+                    except queue.Full:
+                        logger.warning("watch queue full; dropping startup seed: %s", p)
             if self._observer.emitters:
                 self._observer.start()
             else:

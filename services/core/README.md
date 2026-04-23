@@ -23,6 +23,17 @@ Data directory: `MEMORYAGENT_DATA_DIR` or `.memoryagent/` in the current working
 
 Core memory/chat routes (`POST /api/v1/memory/entries`, `POST /api/v1/chat`, `GET /api/v1/memory/search`, `POST /api/v1/chat/stream`) also require bearer auth. Runtime requires **Ollama** for embedding + chat (`embed_model` / `chat_model` in config).
 
+`GET /api/v1/memory/search` supports optional metadata filters: `source_kind`, `path_prefix`, `indexed_after`, `indexed_before`.
+
+## Ingestion formats
+
+- Supported for file ingestion/indexing: `.md`, `.txt`, `.pdf`, `.docx`
+- PDF uses local text extraction (`pypdf`) and skips image-only PDFs with a clear error.
+- DOCX uses paragraph extraction (`python-docx`) and skips docs with no extractable paragraph text.
+- Per-format size guardrails apply during extraction (text: 2 MiB, PDF/DOCX: 25 MiB).
+- File extraction has a timeout guardrail (default 8s) and logs structured failures.
+- `file.read` tool remains text-file focused (`.md`, `.txt`) by design.
+
 ## Logging (M5 hardening)
 
 - Core logs write to console and rotating file: `MEMORYAGENT_DATA_DIR/logs/core.log`.

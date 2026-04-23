@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +16,7 @@ from memoryagent.embeddings import DeterministicEmbedder
 from memoryagent.rag_service import RagService
 from memoryagent.secrets import bearer_token_path
 from memoryagent.vector_store import VectorStore
-from memoryagent.watcher import build_ignore_spec, path_matches_ignore
+from memoryagent.watcher import build_ignore_spec, collect_supported_files, path_matches_ignore
 
 
 @pytest.fixture()
@@ -59,6 +60,23 @@ def test_ignore_globs_match() -> None:
     assert not path_matches_ignore("notes/hello.md", spec)
 
 
+def test_collect_supported_files_honors_ignore_and_suffixes(data_dir: Path) -> None:
+    root = data_dir / "watchroot"
+    root.mkdir()
+    (root / "a.md").write_text("a", encoding="utf-8")
+    (root / "b.txt").write_text("b", encoding="utf-8")
+    (root / "c.pdf").write_bytes(b"%PDF-1.4\n%fake")
+    (root / "d.docx").write_bytes(b"fake")
+    (root / "skip.bin").write_bytes(b"x")
+    (root / "node_modules").mkdir()
+    (root / "node_modules" / "e.md").write_text("ignore me", encoding="utf-8")
+
+    spec = build_ignore_spec(["**/node_modules/**"])
+    out = collect_supported_files(root, spec)
+    names = {p.name for p in out}
+    assert names == {"a.md", "b.txt", "c.pdf", "d.docx"}
+
+
 @pytest.mark.asyncio
 async def test_ingest_file_path_searchable(data_dir: Path) -> None:
     f = data_dir / "fixture.md"
@@ -80,6 +98,71 @@ async def test_ingest_file_path_searchable(data_dir: Path) -> None:
     stats = rag.index_stats()
     assert stats["indexed_files"] >= 1
     assert stats["documents"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_ingest_pdf_path_searchable_with_mock_reader(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    f = data_dir / "fixture.pdf"
+    f.write_bytes(b"%PDF-1.4\n% fake")
+
+    class _P:
+        def __init__(self, t: str) -> None:
+            self._t = t
+
+        def extract_text(self) -> str:
+            return self._t
+
+    class _R:
+        def __init__(self, _path: str) -> None:
+            self.pages = [_P("Statement amount 123"), _P("Bank account ending 1111")]
+
+    monkeypatch.setattr("memoryagent.document_extractors.PdfReader", _R)
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+    )
+
+    await rag.ingest_file_path(f)
+    results = await rag.search("bank statement")
+    assert results
+    assert "statement" in results[0].snippet.lower() or "bank" in results[0].snippet.lower()
+
+
+@pytest.mark.asyncio
+async def test_ingest_docx_path_searchable_with_mock_reader(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    f = data_dir / "fixture.docx"
+    f.write_bytes(b"fake")
+
+    class _Para:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+    class _Doc:
+        def __init__(self, _path: str) -> None:
+            self.paragraphs = [_Para("Quarterly bank statement"), _Para("Account 1111")]
+
+    monkeypatch.setattr("memoryagent.document_extractors.Document", _Doc)
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+    )
+
+    await rag.ingest_file_path(f)
+    results = await rag.search("bank statement")
+    assert results
+    assert "statement" in results[0].snippet.lower() or "bank" in results[0].snippet.lower()
 
 
 def test_patch_config_watched_roots(data_dir: Path, client: TestClient) -> None:
@@ -110,3 +193,115 @@ def test_patch_config_rejects_missing_dir(data_dir: Path, client: TestClient) ->
     )
     assert r.status_code == 400
     assert r.json()["detail"]["error"]["code"] == "VALIDATION"
+
+
+@pytest.mark.asyncio
+async def test_search_filter_source_kind(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    md = data_dir / "notes.md"
+    md.write_text("Project zephyr notes", encoding="utf-8")
+    pdf = data_dir / "statement.pdf"
+    pdf.write_bytes(b"%PDF fake")
+
+    class _P:
+        def __init__(self, t: str) -> None:
+            self._t = t
+
+        def extract_text(self) -> str:
+            return self._t
+
+    class _R:
+        def __init__(self, _path: str) -> None:
+            self.pages = [_P("bank statement april")]
+    monkeypatch.setattr("memoryagent.document_extractors.PdfReader", _R)
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+    )
+
+    await rag.ingest_file_path(md)
+    await rag.ingest_file_path(pdf)
+    from memoryagent.rag_service import SearchFilters
+
+    results = await rag.search("statement", filters=SearchFilters(source_kind="file_pdf"))
+    assert results
+    assert "statement" in results[0].snippet.lower()
+
+
+@pytest.mark.asyncio
+async def test_search_filter_path_prefix(data_dir: Path) -> None:
+    scope = data_dir / "scope"
+    other = data_dir / "other"
+    scope.mkdir()
+    other.mkdir()
+    f1 = scope / "a.md"
+    f2 = other / "b.md"
+    f1.write_text("bank statement scoped", encoding="utf-8")
+    f2.write_text("bank statement other", encoding="utf-8")
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+    )
+    await rag.ingest_file_path(f1)
+    await rag.ingest_file_path(f2)
+    from memoryagent.rag_service import SearchFilters
+
+    results = await rag.search(
+        "bank statement",
+        filters=SearchFilters(path_prefix=scope.resolve().as_uri()),
+    )
+    assert results
+    assert all("scoped" in r.snippet.lower() for r in results)
+
+
+def test_memory_search_filter_invalid_indexed_after(
+    data_dir: Path, client: TestClient
+) -> None:
+    h = _auth(data_dir)
+    r = client.get(
+        "/api/v1/memory/search",
+        params={"q": "anything", "indexed_after": "not-an-iso"},
+        headers=h,
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"]["code"] == "VALIDATION"
+
+
+def test_query_text_filters_last_month_window() -> None:
+    from memoryagent.rag_service import _filters_from_query_text
+
+    f = _filters_from_query_text("find bank statement in the last month as pdf")
+    assert f.source_kind == "file_pdf"
+    assert f.indexed_after is not None
+    assert f.indexed_before is not None
+
+
+@pytest.mark.asyncio
+async def test_ingest_file_path_extraction_timeout(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    f = data_dir / "slow.md"
+    f.write_text("hello", encoding="utf-8")
+
+    def _slow(_path: Path) -> tuple[str, str]:
+        time.sleep(0.05)
+        return "hello", "file"
+
+    monkeypatch.setattr("memoryagent.rag_service.extract_text_from_path", _slow)
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+        extract_timeout_seconds=0.001,
+    )
+    with pytest.raises(ValueError, match="timed out"):
+        await rag.ingest_file_path(f)

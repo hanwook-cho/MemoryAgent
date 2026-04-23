@@ -43,9 +43,21 @@ class VectorStore:
     def query(self, embedding: list[float], n_results: int = 8) -> list[dict[str, Any]]:
         if self._col.count() == 0:
             return []
+        return self.query_with_filters(embedding, n_results=n_results, where=None)
+
+    def query_with_filters(
+        self,
+        embedding: list[float],
+        *,
+        n_results: int = 8,
+        where: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        if self._col.count() == 0:
+            return []
         res = self._col.query(
             query_embeddings=[embedding],
             n_results=min(n_results, max(1, self._col.count())),
+            where=where,
             include=["documents", "metadatas", "distances"],
         )
         out: list[dict[str, Any]] = []

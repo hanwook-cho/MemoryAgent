@@ -9,6 +9,7 @@ Under `~/Library/Application Support/MemoryAgent/` (or user override per NFR-3):
 | `config.json` | Ports, bind address, model names, watched roots, feature flags |
 | `secrets/` | Local API token material; never logged |
 | `store/vector/` | Vector database files |
+| `store/file_index.db` | File index metadata DB for incremental reindex decisions |
 | `store/chunks/` | Optional chunk cache or derived text for debugging |
 | `mirror/` | Human-readable Markdown mirror (`SOUL.md`, `USER.md`, optional per-topic files) |
 | `logs/` | Rotated local logs (no remote shipping) |
@@ -24,7 +25,7 @@ Represents a source item before or after chunking.
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `id` | UUID | Stable identifier |
-| `source_kind` | enum | `file`, `calendar`, `reminder`, `note`, `user_entry`, `cli` |
+| `source_kind` | enum | `memory`, `file`, `file_pdf`, `file_docx`, `mirror`, `calendar`, `reminder`, `note`, `cli` |
 | `uri` | string | e.g. `file:///...`, `cal://event/id`, or synthetic |
 | `title` | string | Optional display title |
 | `content_hash` | string | Hash of canonical extracted text for change detection |
@@ -53,12 +54,14 @@ Represents a source item before or after chunking.
 
 ## 3. Chunk metadata (for filtering and audit)
 
-Recommended keys (extensible):
+Current keys used in retrieval/audit (extensible):
 
-- `source_path` — for file-backed docs  
-- `heading` — nearest Markdown heading if detected  
-- `mtime` — file modification time  
-- `ingestion_job_id` — trace batch  
+- `source` — URI for origin (for file docs, usually `file://...`)  
+- `source_kind` — normalized source type (`memory`, `file`, `file_pdf`, `file_docx`, `mirror`, ...)  
+- `indexed_at` — ISO-8601 timestamp when chunk was indexed  
+- `document_id` — stable document grouping key  
+- `chunk_index` — ordinal for chunk within document  
+- `tags` — comma-joined tags for memory entries  
 
 ## 4. Markdown mirror (`SOUL.md` / `USER.md`)
 

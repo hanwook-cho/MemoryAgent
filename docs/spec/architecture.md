@@ -64,8 +64,9 @@ Keeping the **API and RAG in one service** avoids distributed transactions and s
 ## 5. Data flow (ingestion path)
 
 1. File system events or scheduled scans enqueue **raw documents** with metadata (path, mtime, source).
-2. Text extraction (plain text, Markdown, optional PDF later) → **chunking** (see [`data-model.md`](data-model.md)).
-3. Embeddings computed locally → upsert into vector DB; **human-readable** Markdown mirrors updated per policy (not necessarily 1:1 with every chunk).
+2. Extraction supports `.md`, `.txt`, `.pdf`, `.docx` with per-format size guardrails and timeout/error handling.
+3. File index metadata DB decides skip/reindex for unchanged files; changed files continue to chunking (see [`data-model.md`](data-model.md)).
+4. Embeddings computed locally → upsert into vector DB; **human-readable** Markdown mirrors updated per policy (not necessarily 1:1 with every chunk).
 
 ## 6. Web UI constraints
 

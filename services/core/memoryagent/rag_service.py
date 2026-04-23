@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+import asyncio
 
 from memoryagent.calendar_bridge import (
     CalendarPermissionDenied,
@@ -22,12 +25,16 @@ from memoryagent.calendar_intent import (
     title_keywords,
 )
 from memoryagent.chunking import chunk_text
+from memoryagent.document_extractors import extract_text_from_path
 from memoryagent.embeddings import Embedder
+from memoryagent.file_index_db import FileIndexDB, PARSER_VERSION
 from memoryagent.memory_intent import extract_memory_save_text
 from memoryagent.mirror import parse_mirror_file
 from memoryagent.llm_client import LlmClient
 from memoryagent.schemas import ChatMessage, ChatResponse, Citation, SearchResultItem
 from memoryagent.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 
 class RagService:
@@ -38,12 +45,15 @@ class RagService:
         store: VectorStore,
         embedder: Embedder,
         llm: LlmClient,
+        extract_timeout_seconds: float = 8.0,
     ) -> None:
         self._data_dir = data_dir
         self._store = store
         self._embedder = embedder
         self._llm = llm
+        self._extract_timeout_seconds = extract_timeout_seconds
         self._stats_path = data_dir / "store" / "ingest_stats.json"
+        self._file_index = FileIndexDB(data_dir / "store" / "file_index.db")
 
     def _load_stats(self) -> dict[str, Any]:
         default: dict[str, Any] = {"memory_documents": 0, "indexed_file_uris": []}
@@ -111,6 +121,7 @@ class RagService:
         documents: list[str] = []
         metadatas: list[dict[str, Any]] = []
 
+        now_iso = datetime.now().astimezone().isoformat()
         for i, chunk in enumerate(chunks):
             cid = f"{document_id}:{i}"
             emb = await self._embedder.embed(chunk)
@@ -123,6 +134,8 @@ class RagService:
                     "chunk_index": i,
                     "source": source,
                     "tags": ",".join(tags),
+                    "source_kind": "memory",
+                    "indexed_at": now_iso,
                 }
             )
 
@@ -136,20 +149,54 @@ class RagService:
         return document_id, document_id
 
     async def ingest_file_path(self, path: Path) -> str:
-        """Read a UTF-8 text file, replace prior chunks for the same path, embed, upsert."""
+        """Extract text from supported file, replace prior chunks, embed, upsert."""
         p = path.expanduser().resolve()
         if not p.is_file():
             raise FileNotFoundError(str(p))
-        suf = p.suffix.lower()
-        if suf not in (".md", ".txt"):
-            raise ValueError(f"unsupported file type: {suf}")
-        text = p.read_text(encoding="utf-8")
+        try:
+            text, source_kind = await asyncio.wait_for(
+                asyncio.to_thread(extract_text_from_path, p),
+                timeout=self._extract_timeout_seconds,
+            )
+        except TimeoutError as e:
+            logger.error(
+                "extract_failed reason=timeout path=%s timeout_seconds=%.2f",
+                str(p),
+                self._extract_timeout_seconds,
+            )
+            raise ValueError(
+                f"extraction timed out after {self._extract_timeout_seconds:.2f}s"
+            ) from e
+        except Exception:
+            logger.exception("extract_failed reason=error path=%s", str(p))
+            raise
         uri = p.as_uri()
         document_id = str(uuid.uuid5(uuid.NAMESPACE_URL, uri))
+        st = p.stat()
+        if not self._file_index.should_reindex(
+            uri=uri,
+            size_bytes=int(st.st_size),
+            mtime_ns=int(st.st_mtime_ns),
+            parser_version=PARSER_VERSION,
+        ):
+            # Unchanged file: skip parse/embed/upsert.
+            self._ensure_file_uri(uri)
+            return document_id
+
         self._store.delete_by_document_id(document_id)
         chunks = chunk_text(text)
         if not chunks:
             self._ensure_file_uri(uri)
+            self._file_index.upsert(
+                uri=uri,
+                path=str(p),
+                document_id=document_id,
+                size_bytes=int(st.st_size),
+                mtime_ns=int(st.st_mtime_ns),
+                parser_version=PARSER_VERSION,
+                source_kind=source_kind,
+                indexed_at=datetime.now().astimezone().isoformat(),
+            )
             return document_id
 
         ids: list[str] = []
@@ -157,6 +204,7 @@ class RagService:
         documents: list[str] = []
         metadatas: list[dict[str, Any]] = []
 
+        indexed_at = datetime.now().astimezone().isoformat()
         for i, chunk in enumerate(chunks):
             cid = f"{document_id}:{i}"
             emb = await self._embedder.embed(chunk)
@@ -169,7 +217,8 @@ class RagService:
                     "chunk_index": i,
                     "source": uri,
                     "tags": "",
-                    "source_kind": "file",
+                    "source_kind": source_kind,
+                    "indexed_at": indexed_at,
                 }
             )
 
@@ -180,6 +229,16 @@ class RagService:
             metadatas=metadatas,
         )
         self._ensure_file_uri(uri)
+        self._file_index.upsert(
+            uri=uri,
+            path=str(p),
+            document_id=document_id,
+            size_bytes=int(st.st_size),
+            mtime_ns=int(st.st_mtime_ns),
+            parser_version=PARSER_VERSION,
+            source_kind=source_kind,
+            indexed_at=indexed_at,
+        )
         return document_id
 
     async def ingest_mirror_document(self, path: Path, *, mirror_key: str) -> str:
@@ -231,14 +290,26 @@ class RagService:
         self._ensure_file_uri(uri)
         return document_id
 
-    async def search(self, query: str, *, limit: int = 20) -> list[SearchResultItem]:
+    async def search(
+        self, query: str, *, limit: int = 20, filters: SearchFilters | None = None
+    ) -> list[SearchResultItem]:
         if self._store.count() == 0:
             return []
+        filters = filters or SearchFilters()
         qemb = await self._embedder.embed(query)
-        raw = self._store.query(qemb, n_results=min(limit, max(1, self._store.count())))
+        where: dict[str, Any] | None = None
+        if filters.source_kind:
+            where = {"source_kind": {"$eq": filters.source_kind}}
+        raw = self._store.query_with_filters(
+            qemb,
+            n_results=min(limit * 4, max(1, self._store.count())),
+            where=where,
+        )
         out: list[SearchResultItem] = []
         for row in raw:
             meta = row.get("metadata") or {}
+            if not _meta_matches_filters(meta, filters):
+                continue
             doc_id = str(meta.get("document_id", ""))
             snippet = (row.get("document") or "")[:500]
             out.append(
@@ -249,6 +320,8 @@ class RagService:
                     document_id=doc_id,
                 )
             )
+            if len(out) >= limit:
+                break
         return out
 
     async def _retrieve_for_chat(
@@ -258,7 +331,8 @@ class RagService:
             (m.content for m in reversed(messages) if m.role == "user"),
             "",
         )
-        hits = await self.search(last_user, limit=8)
+        filters = _filters_from_query_text(last_user)
+        hits = await self.search(last_user, limit=8, filters=filters)
         context_blocks = [h.snippet for h in hits if h.snippet]
         citations = [
             Citation(chunk_id=h.chunk_id, snippet=h.snippet, score=h.score)
@@ -550,3 +624,53 @@ def _format_local_datetime(iso: str) -> str:
         return dt_local.strftime("%H:%M, %m:%d:%Y")
     except ValueError:
         return raw
+
+
+@dataclass(slots=True)
+class SearchFilters:
+    source_kind: str | None = None
+    path_prefix: str | None = None
+    indexed_after: datetime | None = None
+    indexed_before: datetime | None = None
+
+
+def _meta_matches_filters(meta: dict[str, Any], filters: SearchFilters) -> bool:
+    if filters.path_prefix:
+        source = str(meta.get("source", ""))
+        if not source.startswith(filters.path_prefix):
+            return False
+    if filters.indexed_after or filters.indexed_before:
+        raw = str(meta.get("indexed_at", "")).strip()
+        if not raw:
+            return False
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if filters.indexed_after and dt < filters.indexed_after:
+            return False
+        if filters.indexed_before and dt > filters.indexed_before:
+            return False
+    return True
+
+
+def _filters_from_query_text(text: str) -> SearchFilters:
+    q = (text or "").lower()
+    now = datetime.now().astimezone()
+    filters = SearchFilters()
+    if "pdf" in q:
+        filters.source_kind = "file_pdf"
+    elif "docx" in q or "word document" in q or "word file" in q:
+        filters.source_kind = "file_docx"
+    elif "markdown" in q or ".md" in q:
+        filters.source_kind = "file"
+
+    if "last month" in q:
+        first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_prev_month = first_this_month - timedelta(microseconds=1)
+        first_prev_month = last_prev_month.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        filters.indexed_after = first_prev_month
+        filters.indexed_before = last_prev_month
+    return filters

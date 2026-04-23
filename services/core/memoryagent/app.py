@@ -6,6 +6,7 @@ import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ from memoryagent.logging_setup import configure_logging
 from memoryagent.mirror import MIRROR_FILES, ensure_mirror_file, validate_mirror_content
 from memoryagent.ollama import ollama_reachable
 from memoryagent.paths import default_data_dir, web_dist
-from memoryagent.rag_service import RagService
+from memoryagent.rag_service import RagService, SearchFilters
 from memoryagent.calendar_bridge import CalendarPermissionDenied, run_create_event
 from memoryagent.tool_registry import build_default_registry
 from memoryagent.schemas import (
@@ -368,9 +369,40 @@ def create_app(
         return MemoryEntryResponse(document_id=doc_id, job_id=job_id)
 
     @router.get("/memory/search")
-    async def memory_search(q: str, limit: int = 20) -> SearchResponse:
+    async def memory_search(
+        q: str,
+        limit: int = 20,
+        source_kind: str | None = None,
+        path_prefix: str | None = None,
+        indexed_after: str | None = None,
+        indexed_before: str | None = None,
+    ) -> SearchResponse:
         try:
-            results = await rag.search(q, limit=limit)
+            dt_after = (
+                datetime.fromisoformat(indexed_after.replace("Z", "+00:00"))
+                if indexed_after
+                else None
+            )
+            dt_before = (
+                datetime.fromisoformat(indexed_before.replace("Z", "+00:00"))
+                if indexed_before
+                else None
+            )
+            results = await rag.search(
+                q,
+                limit=limit,
+                filters=SearchFilters(
+                    source_kind=source_kind,
+                    path_prefix=path_prefix,
+                    indexed_after=dt_after,
+                    indexed_before=dt_before,
+                ),
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "VALIDATION", "message": str(e)}},
+            ) from e
         except (httpx.HTTPError, OSError, RuntimeError) as e:
             logger.exception("api_error event=memory_search_failed code=MODEL_UNAVAILABLE")
             raise HTTPException(

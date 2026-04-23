@@ -40,8 +40,9 @@ This document maps **each milestone** in [`milestones.md`](milestones.md) to **w
 | Goal | Automated | Manual / smoke |
 | :--- | :--- | :--- |
 | Ignore globs / debounce | **Unit/integration:** synthetic fs or temp dir; assert single index after burst of writes | — |
-| Reindex updates retrieval | **Integration:** write fixture `.md`, wait for job (or trigger), `GET /memory/search?q=…` finds new terms | Edit real file under watched root |
+| Reindex updates retrieval | **Integration:** write fixture (`.md`, `.txt`, mocked `.pdf`/`.docx`), wait for job (or trigger), `GET /memory/search?q=…` finds new terms | Edit real file under watched root |
 | Backpressure | **Integration or load test:** many files; assert queue depth / no crash (threshold in test doc) | Activity Monitor spot check |
+| Metadata-aware retrieval filters | **Integration:** `GET /memory/search` with `source_kind`, `path_prefix`, `indexed_after`, `indexed_before` returns constrained results | Ask natural query like “find bank statement in the last month” and verify relevance |
 
 **Exit:** CI on **macOS** runs watcher tests; Linux CI may skip or use fake file event source if implemented.
 

@@ -13,6 +13,7 @@ Local-first memory assistant for macOS — see [`requirement.md`](requirement.md
 - M4 complete for tools + calendar EventKit path: `calendar.list_events`, `calendar.search_past_events`, `calendar.create_event`.
 - REST wrapper for calendar create is live: `POST /api/v1/calendar/events`.
 - Optional M4 remainder: Reminders read integration.
+- Document format expansion plan (index DB + PDF/DOCX): `docs/spec/pdf-docx-index-plan.md` (index DB + PDF + DOCX + metadata-aware retrieval now implemented).
 
 ## M0 / M4 quick start
 

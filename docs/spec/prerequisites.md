@@ -26,6 +26,7 @@ After models are installed, **no internet** is required for core operation (**FR
 | **Git** | Version control. |
 | **Core language runtime(s)** | Depends on implementation (e.g. Python 3.11+ for a Python core, Node.js LTS for a JS/TS web toolchain). Not fixed in the SRS; follow the repository `README` when it exists. |
 | **Same local LLM + embedding setup as §1** | Needed to exercise chat and indexing end-to-end. |
+| **Document extraction dependencies** | For source builds with PDF/DOCX ingest enabled: Python deps include `pypdf` and `python-docx` (installed by `pip install -e ".[dev]"` in current implementation). |
 
 ---
 

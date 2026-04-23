@@ -107,9 +107,15 @@ Request / response shapes are defined in **`agent-actions.md`**; core service re
 
 ### 3.6 Search (debug / power users)
 
-`GET /memory/search?q=...&limit=20`
+`GET /memory/search?q=...&limit=20&source_kind=...&path_prefix=...&indexed_after=...&indexed_before=...`
 
 Returns ranked chunks with scores for UI “sources” panel.
+
+Optional metadata filters:
+
+- `source_kind`: exact match (examples: `memory`, `file`, `file_pdf`, `file_docx`, `mirror`)
+- `path_prefix`: URI prefix match against chunk metadata source (e.g. `file:///Users/me/Documents/`)
+- `indexed_after` / `indexed_before`: ISO-8601 bounds applied to chunk `indexed_at`
 
 ### 3.7 Configuration (read)
 
