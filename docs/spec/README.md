@@ -1,6 +1,6 @@
 # MemoryAgent — detailed specification (index)
 
-This folder expands the high-level [`requirement.md`](../../requirement.md) into implementable contracts. **Development:** open PRs against **`ma-dist`** (see [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)). **OS integration order** (files → EventKit calendar/reminders → optional Notes; defer Mail/IMAP pattern; no iMessage/Journal baseline) is defined in **requirement §2.1.1**. Read in this order:
+This folder expands the high-level [`requirement.md`](../../requirement.md) into implementable contracts. **Git workflow:** open PRs against **`ma-dist`** (default integration branch — **not** macOS-only; see [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)). **OS integration order** (files → EventKit calendar/reminders → optional Notes; defer Mail/IMAP pattern; no iMessage/Journal baseline) is defined in **requirement §2.1.1**. Read in this order:
 
 | Document | Contents |
 | :--- | :--- |

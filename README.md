@@ -155,4 +155,4 @@ In app chat, ask **`what can you do for me?`** (or **`help`**) to get this capab
 
 ## Contributing
 
-How to propose changes, run tests, and open pull requests is described in [`CONTRIBUTING.md`](CONTRIBUTING.md). That workflow is **not** tied to a single Git branch name in this README; clone any default branch and follow the guide there.
+How to propose changes, run tests, and open pull requests is described in [`CONTRIBUTING.md`](CONTRIBUTING.md). The default merge branch there is **`ma-dist`**, which is the project **integration** line—not “macOS-only” despite the name; follow the guide for bases and checks.
