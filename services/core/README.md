@@ -1,6 +1,6 @@
 # MemoryAgent core
 
-Local HTTP API (`FastAPI` + `uvicorn`). See repository root `README.md` and `docs/spec/http-api.md`. **MP1:** `edge_base_url` + `deployment_mode` in `config.json`; `GET /api/v1/admin/status` and `/api/v1/admin/control/*` per `docs/spec/client-api.md` §3.11.
+Local HTTP API (`FastAPI` + `uvicorn`). See repository root `README.md` and `docs/spec/http-api.md`. **MP1:** `edge_base_url` + `deployment_mode`; admin §3.11; **`host_edge` / `hybrid`** use Edge `POST /retrieve` via `memoryagent/remote_retrieval.py` + `backends.py` (rebind on `PATCH /config` when mode or edge URL changes).
 
 ```bash
 cd services/core

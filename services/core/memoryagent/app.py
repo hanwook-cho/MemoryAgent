@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from memoryagent import __version__
 from memoryagent.auth_http import BearerChecker
-from memoryagent.backends import build_local_backends
+from memoryagent.backends import build_runtime_backends
 from memoryagent.config_store import (
     KNOWN_DEPLOYMENT_MODES,
     AppConfig,
@@ -93,7 +93,8 @@ def create_app(
     else:
         rag = rag_service
 
-    backends = build_local_backends(rag)
+    backends = build_runtime_backends(rag, cfg, bearer_token=bearer_token)
+    rag.bind_retrieval_for_chat(backends.retrieval)
     retrieval = backends.retrieval
     ingest = backends.ingest
 
@@ -191,6 +192,7 @@ def create_app(
 
     @router.patch("/config")
     async def patch_config(body: ConfigPatchRequest) -> dict[str, Any]:
+        nonlocal retrieval, backends
         c = load_config(data_dir)
         if body.watched_roots is not None:
             for raw in body.watched_roots:
@@ -228,6 +230,11 @@ def create_app(
         if body.edge_base_url is not None:
             c.edge_base_url = normalize_edge_base_url(body.edge_base_url)
         save_config(data_dir, c)
+        if body.deployment_mode is not None or body.edge_base_url is not None:
+            backends = build_runtime_backends(rag, c, bearer_token=bearer_token)
+            retrieval = backends.retrieval
+            rag.bind_retrieval_for_chat(retrieval)
+            app.state.mp1_backends = backends
         watcher.restart(asyncio.get_running_loop(), load_config(data_dir))
         return await get_config()
 

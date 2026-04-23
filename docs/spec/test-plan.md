@@ -119,6 +119,17 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 
 **Exit:** [`tests/test_mp1_phase3.py`](../../services/core/tests/test_mp1_phase3.py) green on `ma-dist`.
 
+### 7.4 MP1 — Remote retrieve (`POST /retrieve`)
+
+| Goal | Automated | Manual / smoke |
+| :--- | :--- | :--- |
+| `host_edge` retrieval | **Integration:** mocked `try_node_retrieve` → `GET /memory/search` returns edge rows after `PATCH` mode+URL (`tests/test_mp1_remote_retrieve.py`) | Real edge Node |
+| Fallback | **Unit:** remote returns `None` → local Chroma hits | — |
+| `hybrid` merge | **Unit:** local + remote merged by best score per `chunk_id` | — |
+| Chat RAG path | **Integration:** existing chat tests with `bind_retrieval_for_chat` | — |
+
+**Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py) green.
+
 ## 8. Optional — Native shell
 
 | Goal | Automated | Manual |

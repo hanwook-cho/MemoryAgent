@@ -10,8 +10,11 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import asyncio
+
+if TYPE_CHECKING:
+    from memoryagent.backends import RetrievalBackend
 
 from memoryagent.calendar_bridge import (
     CalendarPermissionDenied,
@@ -54,6 +57,11 @@ class RagService:
         self._extract_timeout_seconds = extract_timeout_seconds
         self._stats_path = data_dir / "store" / "ingest_stats.json"
         self._file_index = FileIndexDB(data_dir / "store" / "file_index.db")
+        self._retrieval_for_chat: RetrievalBackend | None = None
+
+    def bind_retrieval_for_chat(self, backend: "RetrievalBackend") -> None:
+        """MP1: use the same ``RetrievalBackend`` as HTTP ``/memory/search`` for RAG chat retrieval."""
+        self._retrieval_for_chat = backend
 
     @property
     def llm_client(self) -> LlmClient:
@@ -343,7 +351,12 @@ class RagService:
             "",
         )
         filters = _filters_from_query_text(last_user)
-        hits = await self.search(last_user, limit=8, filters=filters)
+        if self._retrieval_for_chat is not None:
+            hits = await self._retrieval_for_chat.search(
+                last_user, limit=8, filters=filters
+            )
+        else:
+            hits = await self.search(last_user, limit=8, filters=filters)
         context_blocks = [h.snippet for h in hits if h.snippet]
         citations = [
             Citation(chunk_id=h.chunk_id, snippet=h.snippet, score=h.score)
