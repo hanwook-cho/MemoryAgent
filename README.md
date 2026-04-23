@@ -1,6 +1,12 @@
 # MemoryAgent
 
-Local-first memory assistant for macOS — see [`requirement.md`](requirement.md) and [`docs/spec/`](docs/spec/README.md).
+**MemoryAgent** is a **local-first** memory and retrieval assistant for **macOS**. You use a **local web UI** backed by an on-device **HTTP API** (by default on **127.0.0.1**) for chat with **RAG** over files you choose to watch and facts you save; **embeddings and chat** run **on the Mac** by default (no cloud required for core use). **Tools** (for example **EventKit** calendar read/create) use a small **Swift bridge** where the OS requires it. Formal requirements: [`requirement.md`](requirement.md); API, architecture, and milestones: [`docs/spec/`](docs/spec/README.md).
+
+## Documentation and roadmap
+
+Planned **distributed / MP1** work (multi-host, optional edge node, Client vs Node API), **PRD/SRS**, verification checklists, **Google Calendar** integration rules, and milestone tests all live under **[`docs/spec/README.md`](docs/spec/README.md)** (indexed table—not “local app only”).
+
+**On GitHub:** the repository **front page** shows the **default** branch (`main`). That branch can **lag** behind integration work. To read the same **README** and **spec tree** as current development, use the branch menu and select **`ma-dist`**, or merge **`ma-dist` → `main`** when you want the default view to catch up (see open PRs).
 
 ## Stack (M4)
 
@@ -58,7 +64,7 @@ Open **http://127.0.0.1:8765/** — static UI loads from `web/dist`. The first l
 | **Calendar permission denied from API but manual helper works** | TCC is per host app/process. Run `./scripts/run.sh` from Terminal.app once (or enable Calendar for Cursor/Python host process) and retry. |
 
 - **API docs (OpenAPI):** http://127.0.0.1:8765/api/v1/docs  
-- **Health (no auth):** `GET /api/v1/health`
+- **Health (no auth):** `GET /api/v1/health` (includes `deployment` / degraded flags when config uses non-`standalone` modes; see OpenAPI)
 
 **Web dev (Vite proxy):** `cd web && npm run dev` → uses proxy to port 8765; run the core separately.
 
@@ -152,3 +158,7 @@ Use these patterns in chat for the best results:
   `schedule dentist checkup at 2026-07-01T14:00:00Z to 2026-07-01T15:00:00Z in Smile Clinic`
 
 In app chat, ask **`what can you do for me?`** (or **`help`**) to get this capability guide.
+
+## Contributing
+
+How to propose changes, run tests, and open pull requests is described in [`CONTRIBUTING.md`](CONTRIBUTING.md). The default merge branch there is **`ma-dist`**, which is the project **integration** line—not “macOS-only” despite the name; follow the guide for bases and checks.

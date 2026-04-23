@@ -33,6 +33,10 @@ def test_health_ok(client: TestClient) -> None:
     body = r.json()
     assert body["status"] == "ok"
     assert body["version"] == "0.1.0"
+    dep = body["deployment"]
+    assert dep["mode"] == "standalone"
+    assert dep["degraded"] is False
+    assert dep["degraded_reason"] is None
     assert body["llm"]["backend"] == "ollama"
     assert body["llm"]["reachable"] is False
     idx = body["index"]
@@ -57,6 +61,7 @@ def test_config_with_token(client: TestClient, data_dir: Path) -> None:
     body = r.json()
     assert body["chat_model"] == "llama3.2"
     assert body["embed_model"] == "nomic-embed-text"
+    assert body.get("deployment_mode") == "standalone"
 
 
 def test_openapi_json(client: TestClient) -> None:

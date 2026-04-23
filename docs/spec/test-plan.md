@@ -16,7 +16,7 @@ This document maps **each milestone** in [`milestones.md`](milestones.md) to **w
 
 | Goal | Automated | Manual / smoke |
 | :--- | :--- | :--- |
-| Core starts, binds loopback | **Integration:** `GET /health` → 200, JSON shape per [`http-api.md`](http-api.md) | First launch generates token on disk |
+| Core starts, binds loopback | **Integration:** `GET /health` → 200, JSON shape per [`client-api.md`](client-api.md) | First launch generates token on disk |
 | Bearer enforced | **Integration:** request without `Authorization` → 401; with token → 200 on protected routes | — |
 | Static web served | **Optional E2E:** `GET /` → 200, `Content-Type` HTML | Open in browser |
 | Docs in sync | **CI:** link check or OpenAPI diff if OpenAPI exists | Review |
@@ -77,8 +77,35 @@ This document maps **each milestone** in [`milestones.md`](milestones.md) to **w
 | NFR-1 / NFR-2 | **Scripted:** measure cold/warm time to first token, idle CPU (document hardware in [`prerequisites.md`](prerequisites.md)) | Compare on reference Mac |
 | Logs | **Integration:** rotation/truncate after N MB | Inspect files |
 | Packaging / launchd | **Smoke:** install script exits 0; service starts | User installs on clean VM |
+| Admin/Debug controls | **Integration:** restricted endpoints enforce auth/confirmation; `cold-start`/`reset-index` behavior and audit logs verified | Manual destructive-operation confirmation UX |
 
 **Exit:** Benchmark doc checked in; CI fails if regression beyond agreed threshold (optional gate).
+
+### 7.1 MP1 — PR-1 (backend scaffolding; default `standalone` unchanged)
+
+**Relationship to [`mp1-verification-checklist.md`](mp1-verification-checklist.md):** that checklist is the **pre-implementation** design gate (**GO** / **NO-GO**). This subsection is the **test plan for the first code PR** after GO.
+
+Scope and acceptance bullets are canonical in [`mp1-pr1.md`](mp1-pr1.md).
+
+| Goal | Automated | Manual / smoke |
+| :--- | :--- | :--- |
+| No regression in default mode | **Integration:** existing suites (`tests/test_m2.py`, M4 tool/chat tests, etc.) remain green with default config | Smoke: `GET /health`, one chat round-trip, one memory search (mock LLM OK) |
+| `deployment_mode` (or equivalent) | **Unit/integration:** default is `standalone`; config load/save preserves field; unknown value policy matches PR-1 doc (reject at startup **or** log + fall back—**one** behavior, tested) | — |
+| Backend seams | **Unit:** local `RetrievalBackend` / `IngestBackend` / `LlmBackend` delegates call into pre-PR-1 behavior (spot-check critical methods used by chat path) | — |
+
+**Exit:** PR-1 merged with tests above; no change to default user-visible behavior documented in [`mp1-pr1.md`](mp1-pr1.md).
+
+### 7.2 MP1 — PR-2 (health `deployment` / degraded)
+
+Scope: [`mp1-pr2.md`](mp1-pr2.md).
+
+| Goal | Automated | Manual / smoke |
+| :--- | :--- | :--- |
+| Health includes `deployment` | **Integration:** `GET /health` has `deployment.mode`, `degraded`, `degraded_reason`; `standalone` → not degraded | — |
+| Non-standalone marks degraded | **Integration:** `PATCH /config` `deployment_mode` → `host_edge`, then `GET /health` shows `degraded: true` and non-empty reason | — |
+| Unit helper | **Unit:** `health_deployment_block` for `standalone` vs `host_edge` | — |
+
+**Exit:** PR-2 merged; [`client-api.md`](client-api.md) health example updated.
 
 ## 8. Optional — Native shell
 
@@ -101,7 +128,7 @@ Use these when **automated** coverage is insufficient or before a release. Repla
 
 | Placeholder | Meaning |
 | :--- | :--- |
-| `<BASE>` | API base, e.g. `http://127.0.0.1:<PORT>/api/v1` (see [`http-api.md`](http-api.md)) |
+| `<BASE>` | API base, e.g. `http://127.0.0.1:<PORT>/api/v1` (see [`client-api.md`](client-api.md)) |
 | `<TOKEN>` | Bearer token from first-run `secrets/` or app UI |
 | `<WEB>` | Web UI URL, e.g. `http://127.0.0.1:<PORT>/` |
 
@@ -312,5 +339,8 @@ Use when there is no Settings UI yet: `<BASE>` and `<TOKEN>` as in the table abo
 ## 11. Related documents
 
 - [`milestones.md`](milestones.md) — acceptance themes
-- [`http-api.md`](http-api.md) — contract under test
+- [`client-api.md`](client-api.md) — contract under test
 - [`agent-actions.md`](agent-actions.md) — tool behaviors to cover in M4
+- [`mp1-pr1.md`](mp1-pr1.md) — first MP1 code PR scope; **§7.1** above maps tests to that PR
+- [`mp1-pr2.md`](mp1-pr2.md) — MP1 PR-2 health deployment/degraded; **§7.2**
+- [`mp1-verification-checklist.md`](mp1-verification-checklist.md) — pre-implementation spec gate (before PR-1 code)

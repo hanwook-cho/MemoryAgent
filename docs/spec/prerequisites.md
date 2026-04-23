@@ -43,7 +43,7 @@ After models are installed, **no internet** is required for core operation (**FR
 
 | Approach | Tradeoff |
 | :--- | :--- |
-| **User installs Ollama (or similar)** | Smaller app bundle; user runs `ollama pull` (or GUI); app checks reachability (e.g. [`http-api.md`](http-api.md) `/health` `llm` field). |
+| **User installs Ollama (or similar)** | Smaller app bundle; user runs `ollama pull` (or GUI); app checks reachability (e.g. [`client-api.md`](client-api.md) `/health` `llm` field). |
 | **Bundle mlx-lm + MLX weights in-app** | Apple Silicon–optimized path; core service loads models via **mlx-lm** (no separate Ollama daemon). Larger download and update cycles. |
 
 The product must remain usable **offline** after assets are local (**FR-8**).

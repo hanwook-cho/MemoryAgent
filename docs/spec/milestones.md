@@ -9,7 +9,7 @@ Phases assume **web UI + local API** as the primary product surface ([`architect
 ## M0 — Repository and contracts
 
 - [x] Monorepo layout: `services/core`, `web`, optional `native-bridge`
-- [x] OpenAPI or static doc for [`http-api.md`](http-api.md) kept in sync (`GET /api/v1/openapi.json`, `/api/v1/docs`)
+- [x] OpenAPI or static doc for [`client-api.md`](client-api.md) kept in sync (`GET /api/v1/openapi.json`, `/api/v1/docs`)
 - [x] Local config and secrets paths documented (repository `README.md`, [`data-model.md`](data-model.md), `MEMORYAGENT_DATA_DIR`)
 
 **Acceptance:** Core service starts, serves health + static web build, enforces bearer token.
@@ -41,9 +41,9 @@ Phases assume **web UI + local API** as the primary product surface ([`architect
 
 - [x] Tool registry with permission checks per [`permissions-matrix.md`](permissions-matrix.md) (`GET /tools`, `POST /tools/invoke`; `memory.save` registered; capability gate for future OS tools)
 - [x] At least one file tool — **`file.read`** via `POST /tools/invoke` (paths under data dir or `watched_roots`; `.md`/`.txt`, max 512 KiB)
-- [x] **EventKit-backed** calendar **read** tool — **`calendar.list_events`** via `POST /tools/invoke` + `native-bridge/macos-calendar` (see [`http-api.md`](http-api.md) §3.10)
+- [x] **EventKit-backed** calendar **read** tool — **`calendar.list_events`** via `POST /tools/invoke` + `native-bridge/macos-calendar` (see [`client-api.md`](client-api.md) §3.10)
 - [x] **Chat-initiated memory save** — `POST /chat` detects save prefixes on the last user message and ingests like `POST /memory/entries`; `POST /tools/invoke` `memory.save` remains available per [`agent-actions.md`](agent-actions.md)
-- [x] **Calendar create** — `calendar.create_event` backed by EventKit; REST `POST /calendar/events` per [`http-api.md`](http-api.md) §3.5
+- [x] **Calendar create** — `calendar.create_event` backed by EventKit; REST `POST /calendar/events` per [`client-api.md`](client-api.md) §3.5
 - [x] **Past event search for place reuse** — `calendar.search_past_events` to fill `location` for recurring-style appointments per [`agent-actions.md`](agent-actions.md) §3.4 before falling back to asking the user
 - [ ] Optional: Reminders read in the same bridge if Calendars permission model allows
 
