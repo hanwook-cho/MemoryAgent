@@ -24,7 +24,7 @@ This folder expands the high-level [`requirement.md`](../../requirement.md) into
 | [`mp1-pr1.md`](mp1-pr1.md) | MP1 first code PR: local backend adapters + `deployment_mode` |
 | [`mp1-pr2.md`](mp1-pr2.md) | MP1 PR-2: health `deployment` block + degraded flag for non-standalone |
 | [`mp1-verification-checklist.md`](mp1-verification-checklist.md) | Pre-implementation GO/NO-GO checklist before MP1 coding |
-| [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) | **GO** for merging **`ma-dist` → `main`** when integration is complete |
+| [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) | **GO** for **`ma-dist` → `main`** when **phases 0–8** verified (§0.1 log) per policy |
 | [`google-calendar-integration.md`](google-calendar-integration.md) | Google Calendar + local EventKit product rules and phases |
 
 **Primary interaction:** users operate a **local web application** in the browser, backed by an on-device API. **Inference** uses a **Mac-local LLM** (e.g. Ollama, **mlx-lm** / MLX), not a remote API, for default operation. Optional native surfaces (menu bar, CLI) complement but are not required for core chat and memory audit flows.

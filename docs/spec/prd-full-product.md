@@ -196,7 +196,7 @@ flowchart LR
 
 - **Quarterly** (or per release): reconcile this PRD with [`milestones.md`](milestones.md) checkboxes and [`distributed-future-plan.md`](distributed-future-plan.md) decision hooks.
 - **Any** new externally visible API: update [`client-api.md`](client-api.md) / [`node-api.md`](node-api.md) in the same release train.
-- **Promotion to `main`:** use [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) when merging **`ma-dist` → `main`** per [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+- **Promotion to `main`:** merging **`ma-dist` → `main`** requires **every phase 0–8** in **§6** of this document to be **verified complete** (evidence or approved waiver per phase), using [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) **§0.1** and [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
 ---
 

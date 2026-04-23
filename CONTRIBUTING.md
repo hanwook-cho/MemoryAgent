@@ -16,7 +16,7 @@ gh pr create --base ma-dist --head your-feature-branch
 
 ## `main` branch policy
 
-**`ma-dist` → `main` merges are gated:** do **not** merge **`ma-dist` into `main`** until **`ma-dist` is fully complete** for the agreed promotion milestone (feature set, docs, and checks the maintainers define for that release).
+**`ma-dist` → `main` merges are gated:** do **not** merge **`ma-dist` into `main`** until **all product phases 0–8** in [`docs/spec/prd-full-product.md`](docs/spec/prd-full-product.md) are **verified complete** (or explicitly waived where marked N/A), per [`docs/spec/ma-dist-promotion-checklist.md`](docs/spec/ma-dist-promotion-checklist.md) **§0.1**.
 
 Until then:
 

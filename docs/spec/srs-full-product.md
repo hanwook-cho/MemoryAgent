@@ -188,6 +188,8 @@ The software system under requirement comprises:
 
 Implementation releases **SHALL** maintain traceability: for each **SR-P** / **NFR-FP** clause exercised in a release, at least one automated or documented manual test in **R-TEST** (or successor) SHALL exist or SHALL be explicitly waived with product approval.
 
+**Promotion to `main`:** a **`ma-dist` → `main`** merge **SHALL NOT** occur until **phases 0–8** are verified per [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) **§0.1** and [`CONTRIBUTING.md`](../../CONTRIBUTING.md), unless those governance documents are formally amended.
+
 ---
 
 ## 10. Traceability
