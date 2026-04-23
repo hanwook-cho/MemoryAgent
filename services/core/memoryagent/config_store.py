@@ -15,6 +15,23 @@ KNOWN_DEPLOYMENT_MODES = frozenset(
 )
 
 
+def normalize_edge_base_url(raw: Any) -> str | None:
+    """Return stripped ``https?://`` URL or ``None``; invalid values become ``None``."""
+    if raw is None or raw == "":
+        return None
+    if not isinstance(raw, str):
+        logger.warning("edge_base_url ignored (not a string): %r", raw)
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    lower = s.lower()
+    if not (lower.startswith("http://") or lower.startswith("https://")):
+        logger.warning("edge_base_url must start with http:// or https://; got %r", raw)
+        return None
+    return s.rstrip("/")
+
+
 def normalize_deployment_mode(raw: Any) -> str:
     """Return a valid ``deployment_mode``; unknown legacy values fall back to ``standalone``."""
     if raw is None or raw == "":
@@ -45,6 +62,7 @@ class AppConfig:
     watch_ignore_globs: list[str] = field(default_factory=_default_ignore_globs)
     watch_debounce_seconds: float = 1.5
     deployment_mode: str = "standalone"
+    edge_base_url: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AppConfig:
@@ -60,10 +78,11 @@ class AppConfig:
             watch_ignore_globs=list(ig) if isinstance(ig, list) else _default_ignore_globs(),
             watch_debounce_seconds=float(d.get("watch_debounce_seconds", 1.5)),
             deployment_mode=normalize_deployment_mode(d.get("deployment_mode")),
+            edge_base_url=normalize_edge_base_url(d.get("edge_base_url")),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "host": self.host,
             "port": self.port,
             "chat_model": self.chat_model,
@@ -74,6 +93,11 @@ class AppConfig:
             "watch_debounce_seconds": self.watch_debounce_seconds,
             "deployment_mode": self.deployment_mode,
         }
+        if self.edge_base_url:
+            d["edge_base_url"] = self.edge_base_url
+        else:
+            d["edge_base_url"] = None
+        return d
 
 
 def config_path(data_dir: Path) -> Path:

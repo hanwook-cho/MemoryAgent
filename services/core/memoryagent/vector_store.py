@@ -84,3 +84,15 @@ class VectorStore:
         if self._col.count() == 0:
             return
         self._col.delete(where={"document_id": {"$eq": document_id}})
+
+    def clear_all(self) -> None:
+        """Drop and recreate the collection (admin reset-index)."""
+        name = self._col.name
+        try:
+            self._client.delete_collection(name)
+        except Exception:
+            pass
+        self._col = self._client.get_or_create_collection(
+            name="memory_chunks",
+            metadata={"hnsw:space": "cosine"},
+        )

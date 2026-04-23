@@ -92,7 +92,7 @@ Phases are **sequenced for risk and dependency**; parallel work is noted where s
 | Item | Detail |
 | :--- | :--- |
 | **Goals** | Backend interfaces, `deployment_mode`, health **degraded** hints, path to Node API **without** breaking standalone ([`prd-mp1-distributed.md`](prd-mp1-distributed.md), [`mp1-pr1.md`](mp1-pr1.md), [`mp1-pr2.md`](mp1-pr2.md)). |
-| **Deliverables** | **Done:** PR-1 adapters, PR-2 health `deployment` block. **Next:** optional `edge_base_url` config, HTTP Node client stub, `meta.degraded` on chat when remote path selected but unavailable; admin/debug endpoints per [`client-api.md`](client-api.md) when prioritized. |
+| **Deliverables** | **Done:** PR-1 adapters, PR-2 health `deployment` block; `edge_base_url` in [`config_store`](../../services/core/memoryagent/config_store.py) + `PATCH /config`; [`node_client.py`](../../services/core/memoryagent/node_client.py) edge `GET /health` stub; health + chat `meta` use [`deployment_runtime.py`](../../services/core/memoryagent/deployment_runtime.py) when edge unreachable; [`client-api.md`](client-api.md) §3.11 admin routes under `/api/v1/admin/*` (status, events tail, control stubs; `factory-reset` → 501). **Next:** remote `RetrievalBackend` / `IngestBackend` fan-out, hybrid merge, TLS policy beyond health ping. |
 | **Dependencies** | [`node-api.md`](node-api.md) contract stable enough to implement client; verification gate [`mp1-verification-checklist.md`](mp1-verification-checklist.md). |
 | **Acceptance** | SRS/PRD MP1 acceptance + test-plan §7.x; standalone default unchanged. |
 | **Note** | MP1 PRD remains the **authoritative MP1** doc; this section only **places** MP1 in the larger roadmap. |

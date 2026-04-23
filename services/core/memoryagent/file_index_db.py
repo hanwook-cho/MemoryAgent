@@ -130,3 +130,7 @@ class FileIndexDB:
         if rec.mtime_ns != int(mtime_ns):
             return True
         return False
+
+    def clear_all(self) -> None:
+        with self._connect() as con:
+            con.execute("DELETE FROM file_index")

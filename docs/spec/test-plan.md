@@ -108,6 +108,17 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 
 **Exit:** PR-2 merged; [`client-api.md`](client-api.md) health example updated.
 
+### 7.3 MP1 — Phase 3 (edge URL, health ping, chat `meta`, admin)
+
+| Goal | Automated | Manual / smoke |
+| :--- | :--- | :--- |
+| `edge_base_url` config | **Integration:** `GET/PATCH /config` round-trip; invalid URL rejected or cleared per [`config_store.py`](../../services/core/memoryagent/config_store.py) | — |
+| Edge health stub | **Unit/integration:** `fetch_edge_health` + `GET /health` `deployment.edge_reachable` when `deployment_mode` ≠ `standalone` and URL set (`tests/test_mp1_pr2.py`) | Point at mock edge or real Node when available |
+| Chat `meta.degraded` | **Integration:** `POST /chat` and `POST /chat/stream` include `meta` / `event: meta` aligned with deployment + edge ping (`tests/test_mp1_phase3.py`, `tests/test_m1.py`) | — |
+| Admin §3.11 | **Integration:** `GET /admin/status`, `GET /admin/events`, control POSTs bearer-gated; `reset-index` clears ingested memory document (`tests/test_mp1_phase3.py`) | Confirm destructive ops in staging only |
+
+**Exit:** [`tests/test_mp1_phase3.py`](../../services/core/tests/test_mp1_phase3.py) green on `ma-dist`.
+
 ## 8. Optional — Native shell
 
 | Goal | Automated | Manual |

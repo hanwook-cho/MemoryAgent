@@ -126,6 +126,8 @@ def test_get_config_includes_deployment_mode(client: TestClient, data_dir: Path)
     assert r.status_code == 200
     body = r.json()
     assert body.get("deployment_mode") == "standalone"
+    assert "edge_base_url" in body
+    assert body.get("edge_base_url") is None
 
 
 def test_patch_config_invalid_deployment_mode(client: TestClient, data_dir: Path) -> None:
@@ -148,6 +150,35 @@ def test_patch_config_deployment_mode_persists(client: TestClient, data_dir: Pat
     assert r.json()["deployment_mode"] == "host_edge"
     c = load_config(data_dir)
     assert c.deployment_mode == "host_edge"
+
+
+def test_patch_config_edge_base_url_persists(client: TestClient, data_dir: Path) -> None:
+    r = client.patch(
+        "/api/v1/config",
+        headers=_auth(data_dir),
+        json={"edge_base_url": "https://edge.example.test"},
+    )
+    assert r.status_code == 200
+    assert r.json()["edge_base_url"] == "https://edge.example.test"
+    c = load_config(data_dir)
+    assert c.edge_base_url == "https://edge.example.test"
+
+
+def test_patch_config_edge_base_url_clear(client: TestClient, data_dir: Path) -> None:
+    client.patch(
+        "/api/v1/config",
+        headers=_auth(data_dir),
+        json={"edge_base_url": "https://edge.example.test"},
+    )
+    r = client.patch(
+        "/api/v1/config",
+        headers=_auth(data_dir),
+        json={"edge_base_url": ""},
+    )
+    assert r.status_code == 200
+    assert r.json().get("edge_base_url") in (None, "")
+    c = load_config(data_dir)
+    assert c.edge_base_url is None
 
 
 def test_app_state_exposes_backends(client: TestClient, data_dir: Path) -> None:

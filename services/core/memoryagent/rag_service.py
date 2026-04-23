@@ -109,6 +109,12 @@ class RagService:
             "chunks": self._store.count(),
         }
 
+    def reset_search_index(self) -> None:
+        """Clear vector chunks, file index rows, and ingest counters (admin ``reset-index``)."""
+        self._store.clear_all()
+        self._file_index.clear_all()
+        self._save_stats({"memory_documents": 0, "indexed_file_uris": []})
+
     async def ingest_memory(
         self,
         text: str,

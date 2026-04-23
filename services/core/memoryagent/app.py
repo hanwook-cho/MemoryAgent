@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -18,13 +19,20 @@ from fastapi.staticfiles import StaticFiles
 from memoryagent import __version__
 from memoryagent.auth_http import BearerChecker
 from memoryagent.backends import build_local_backends
-from memoryagent.config_store import KNOWN_DEPLOYMENT_MODES, load_config, save_config
-from memoryagent.deployment_runtime import health_deployment_block
+from memoryagent.config_store import (
+    KNOWN_DEPLOYMENT_MODES,
+    AppConfig,
+    load_config,
+    normalize_edge_base_url,
+    save_config,
+)
+from memoryagent.deployment_runtime import chat_meta_block, health_deployment_block
 from memoryagent.embeddings import DeterministicEmbedder, Embedder, OllamaEmbedder
 from memoryagent.folder_picker import pick_folder_macos
 from memoryagent.llm_client import FakeLlm, LlmClient, OllamaLlm
 from memoryagent.logging_setup import configure_logging
 from memoryagent.mirror import MIRROR_FILES, ensure_mirror_file, validate_mirror_content
+from memoryagent.node_client import fetch_edge_health
 from memoryagent.ollama import ollama_reachable
 from memoryagent.paths import default_data_dir, web_dist
 from memoryagent.rag_service import RagService, SearchFilters
@@ -94,6 +102,14 @@ def create_app(
     )
     tools_registry = build_default_registry(data_dir)
 
+    async def _edge_ping(c: AppConfig) -> tuple[bool | None, str | None]:
+        if c.deployment_mode == "standalone":
+            return None, None
+        edge = c.edge_base_url
+        if not edge:
+            return None, None
+        return await fetch_edge_health(edge, bearer_token=bearer_token)
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         logger.warning(
@@ -129,10 +145,16 @@ def create_app(
         c = load_config(data_dir)
         reachable = await ollama_reachable(c.ollama_base_url)
         stats = retrieval.index_stats()
+        edge_ok, edge_err = await _edge_ping(c)
         return {
             "status": "ok",
             "version": __version__,
-            "deployment": health_deployment_block(c.deployment_mode),
+            "deployment": health_deployment_block(
+                c.deployment_mode,
+                edge_base_url=c.edge_base_url,
+                edge_reachable=edge_ok,
+                edge_error=edge_err,
+            ),
             "llm": {
                 "backend": "ollama",
                 "reachable": reachable,
@@ -160,6 +182,7 @@ def create_app(
             "watch_ignore_globs": list(c.watch_ignore_globs),
             "watch_debounce_seconds": c.watch_debounce_seconds,
             "deployment_mode": c.deployment_mode,
+            "edge_base_url": c.edge_base_url,
             "ui": {
                 "chat_welcome_dismissed": False,
                 "chat_welcome_version": "3",
@@ -202,6 +225,8 @@ def create_app(
                     },
                 )
             c.deployment_mode = body.deployment_mode
+        if body.edge_base_url is not None:
+            c.edge_base_url = normalize_edge_base_url(body.edge_base_url)
         save_config(data_dir, c)
         watcher.restart(asyncio.get_running_loop(), load_config(data_dir))
         return await get_config()
@@ -440,8 +465,92 @@ def create_app(
             ) from e
         return SearchResponse(results=results)
 
+    @router.get("/admin/status")
+    async def admin_status() -> dict[str, Any]:
+        c = load_config(data_dir)
+        edge_ok, edge_err = await _edge_ping(c)
+        stats = retrieval.index_stats()
+        return {
+            "deployment": health_deployment_block(
+                c.deployment_mode,
+                edge_base_url=c.edge_base_url,
+                edge_reachable=edge_ok,
+                edge_error=edge_err,
+            ),
+            "index": stats,
+            "llm": {
+                "reachable": await ollama_reachable(c.ollama_base_url),
+                "model": c.chat_model,
+            },
+        }
+
+    @router.get("/admin/events")
+    async def admin_events(
+        level: str = "error",
+        since: str | None = None,
+        limit: int = 200,
+    ) -> dict[str, Any]:
+        _ = level, since
+        log_path = data_dir / "logs" / "core.log"
+        events: list[dict[str, Any]] = []
+        if log_path.is_file():
+            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            tail = lines[-max(1, min(limit, 2000)) :]
+            for line in tail:
+                events.append({"line": line})
+        return {"events": events, "count": len(events)}
+
+    @router.post("/admin/control/reindex")
+    async def admin_control_reindex() -> dict[str, Any]:
+        c = load_config(data_dir)
+        watcher.restart(asyncio.get_running_loop(), c)
+        return {"ok": True, "detail": "Watcher restarted; watched files re-seeded."}
+
+    @router.post("/admin/control/restart")
+    async def admin_control_restart() -> dict[str, Any]:
+        c = load_config(data_dir)
+        watcher.restart(asyncio.get_running_loop(), c)
+        return {"ok": True, "detail": "Workers/watchers restarted."}
+
+    @router.post("/admin/control/cold-start")
+    async def admin_control_cold_start() -> dict[str, Any]:
+        return {
+            "ok": True,
+            "detail": "Runtime refresh stub; no persistent data deleted.",
+        }
+
+    @router.post("/admin/control/reset-index")
+    async def admin_control_reset_index() -> dict[str, Any]:
+        rag.reset_search_index()
+        c = load_config(data_dir)
+        watcher.restart(asyncio.get_running_loop(), c)
+        for mid in MIRROR_FILES:
+            mp = ensure_mirror_file(data_dir, mid)
+            try:
+                await ingest.ingest_mirror_document(mp, mirror_key=mid)
+            except Exception:
+                logger.exception("mirror ingest after reset-index failed for %s", mid)
+        return {
+            "ok": True,
+            "detail": "Vector index cleared; ingest counters reset; mirrors re-ingested.",
+        }
+
+    @router.post("/admin/control/factory-reset")
+    async def admin_control_factory_reset() -> None:
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "error": {
+                    "code": "UNAVAILABLE",
+                    "message": "factory-reset is not implemented.",
+                }
+            },
+        )
+
     @router.post("/chat")
     async def post_chat(body: ChatRequest) -> dict[str, Any]:
+        c = load_config(data_dir)
+        edge_ok, edge_err = await _edge_ping(c)
         try:
             out = await rag.chat(body.messages)
         except httpx.HTTPError as e:
@@ -466,15 +575,35 @@ def create_app(
                     }
                 },
             ) from e
-        return out.model_dump()
+        payload = out.model_dump()
+        payload["meta"] = chat_meta_block(
+            c.deployment_mode,
+            edge_base_url=c.edge_base_url,
+            edge_reachable=edge_ok,
+            edge_error=edge_err,
+        )
+        return payload
 
     @router.post("/chat/stream")
     async def post_chat_stream(body: ChatRequest) -> StreamingResponse:
+        c = load_config(data_dir)
+        edge_ok, edge_err = await _edge_ping(c)
+        meta = chat_meta_block(
+            c.deployment_mode,
+            edge_base_url=c.edge_base_url,
+            edge_reachable=edge_ok,
+            edge_error=edge_err,
+        )
+
         async def gen() -> Any:
+            meta_sent = False
             try:
                 async for line in rag.chat_stream_sse(body.messages):
+                    if line.startswith("event: done") and not meta_sent:
+                        meta_sent = True
+                        yield f"event: meta\ndata: {json.dumps(meta)}\n\n"
                     yield line
-            except httpx.HTTPError as e:
+            except httpx.HTTPError:
                 logger.exception("api_error event=chat_stream_failed code=MODEL_UNAVAILABLE")
                 err = '{"code":"MODEL_UNAVAILABLE","message":"Local inference engine not reachable."}'
                 yield f"event: error\ndata: {err}\n\n"

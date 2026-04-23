@@ -103,7 +103,9 @@ def test_chat_stream(client: TestClient, data_dir: Path) -> None:
         assert r.status_code == 200
         text = "".join(r.iter_text())
         assert "event: token" in text
+        assert "event: meta" in text
         assert "event: done" in text
+        assert text.index("event: meta") < text.index("event: done")
 
 
 def test_health_index_counts(client: TestClient, data_dir: Path) -> None:

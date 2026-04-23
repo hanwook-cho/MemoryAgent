@@ -24,11 +24,34 @@ def test_health_deployment_block_standalone() -> None:
     assert d["degraded_reason"] is None
 
 
-def test_health_deployment_block_non_standalone() -> None:
-    d = health_deployment_block("host_edge")
+def test_health_deployment_block_non_standalone_no_edge_url() -> None:
+    d = health_deployment_block("host_edge", edge_base_url=None, edge_reachable=None)
     assert d["mode"] == "host_edge"
     assert d["degraded"] is True
-    assert d["degraded_reason"] and "remote" in d["degraded_reason"].lower()
+    assert d["degraded_reason"] and "edge_base_url" in d["degraded_reason"].lower()
+
+
+def test_health_deployment_block_edge_unreachable() -> None:
+    d = health_deployment_block(
+        "host_edge",
+        edge_base_url="https://edge.example",
+        edge_reachable=False,
+        edge_error="connection refused",
+    )
+    assert d["degraded"] is True
+    assert "connection refused" in (d["degraded_reason"] or "")
+
+
+def test_health_deployment_block_edge_ok() -> None:
+    d = health_deployment_block(
+        "host_edge",
+        edge_base_url="https://edge.example",
+        edge_reachable=True,
+        edge_error=None,
+    )
+    assert d["degraded"] is False
+    assert d["degraded_reason"] is None
+    assert d.get("edge_reachable") is True
 
 
 @pytest.fixture()
@@ -56,6 +79,36 @@ def client(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
         file_watcher=NullFileWatcher(),
     )
     return TestClient(app)
+
+
+def test_health_not_degraded_when_host_edge_and_edge_ping_ok(
+    client: TestClient, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import memoryagent.app as app_mod
+
+    async def ok_edge(_url: str, *, bearer_token: str, timeout_seconds: float = 3.0) -> tuple[bool, str | None]:
+        _ = bearer_token, timeout_seconds
+        return True, None
+
+    monkeypatch.setattr(app_mod, "fetch_edge_health", ok_edge)
+
+    token = bearer_token_path(data_dir).read_text().strip()
+    h = {"Authorization": f"Bearer {token}"}
+    r = client.patch(
+        "/api/v1/config",
+        headers=h,
+        json={
+            "deployment_mode": "host_edge",
+            "edge_base_url": "http://127.0.0.1:19999",
+        },
+    )
+    assert r.status_code == 200
+    rh = client.get("/api/v1/health")
+    assert rh.status_code == 200
+    dep = rh.json()["deployment"]
+    assert dep["mode"] == "host_edge"
+    assert dep["degraded"] is False
+    assert dep.get("edge_reachable") is True
 
 
 def test_health_degraded_when_config_host_edge(

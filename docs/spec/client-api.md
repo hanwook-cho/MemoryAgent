@@ -32,7 +32,8 @@ Response `200`:
   "deployment": {
     "mode": "standalone",
     "degraded": false,
-    "degraded_reason": null
+    "degraded_reason": null,
+    "edge_base_url": null
   },
   "llm": {
     "backend": "ollama",
@@ -72,9 +73,15 @@ Response `200`:
   "citations": [
     { "chunk_id": "...", "snippet": "...", "score": 0.82 }
   ],
-  "session_id": "uuid"
+  "session_id": "uuid",
+  "meta": {
+    "degraded": false,
+    "degraded_reason": null
+  }
 }
 ```
+
+`meta` is always present on `POST /chat`: when `deployment_mode` is not `standalone` and the edge is misconfigured or unreachable, `meta.degraded` is `true` with a stable `degraded_reason`.
 
 ### 3.3 Chat (streaming)
 
@@ -84,6 +91,7 @@ Server emits SSE:
 
 - `event: token` — `data: {"text":"..."}`
 - `event: citation`
+- `event: meta` — `data: {"degraded": false, "degraded_reason": null}` (emitted immediately before `event: done` when the stream completes successfully)
 - `event: done`
 - `event: error`
 
@@ -119,11 +127,11 @@ Optional filters:
 
 ### 3.7 Configuration (read)
 
-`GET /config` — safe subset (no secrets): watched paths, model names, feature flags.
+`GET /config` — safe subset (no secrets): watched paths, model names, feature flags, `deployment_mode`, optional `edge_base_url` (HTTPS edge Node base URL for distributed modes).
 
 ### 3.8 Configuration (write)
 
-`PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`.
+`PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`, `deployment_mode`, `edge_base_url` (empty string clears `edge_base_url`).
 
 ### 3.9 Markdown mirror
 
@@ -135,7 +143,7 @@ Optional filters:
 
 ### 3.11 Admin/Debug mode (restricted)
 
-These endpoints are for admin/debug workflows and SHOULD be hidden behind explicit UI mode + stronger auth policy.
+These endpoints are for admin/debug workflows and SHOULD be hidden behind explicit UI mode + stronger auth policy. They live under the same **`/api/v1`** prefix and bearer auth as other client routes (e.g. `GET /api/v1/admin/status`).
 
 `GET /admin/status`
 
