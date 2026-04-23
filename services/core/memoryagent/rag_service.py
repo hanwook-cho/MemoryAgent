@@ -55,6 +55,11 @@ class RagService:
         self._stats_path = data_dir / "store" / "ingest_stats.json"
         self._file_index = FileIndexDB(data_dir / "store" / "file_index.db")
 
+    @property
+    def llm_client(self) -> LlmClient:
+        """Injectable LLM (MP1 ``LlmBackend`` / local adapter wiring)."""
+        return self._llm
+
     def _load_stats(self) -> dict[str, Any]:
         default: dict[str, Any] = {"memory_documents": 0, "indexed_file_uris": []}
         if not self._stats_path.is_file():

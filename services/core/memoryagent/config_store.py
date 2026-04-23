@@ -3,9 +3,31 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+KNOWN_DEPLOYMENT_MODES = frozenset(
+    {"standalone", "host_edge", "hybrid", "ios_companion"}
+)
+
+
+def normalize_deployment_mode(raw: Any) -> str:
+    """Return a valid ``deployment_mode``; unknown legacy values fall back to ``standalone``."""
+    if raw is None or raw == "":
+        return "standalone"
+    if not isinstance(raw, str):
+        logger.warning(
+            "deployment_mode ignored (not a string): %r; using standalone", raw
+        )
+        return "standalone"
+    if raw not in KNOWN_DEPLOYMENT_MODES:
+        logger.warning("deployment_mode unknown: %r; using standalone", raw)
+        return "standalone"
+    return raw
 
 
 def _default_ignore_globs() -> list[str]:
@@ -22,6 +44,7 @@ class AppConfig:
     watched_roots: list[str] = field(default_factory=list)
     watch_ignore_globs: list[str] = field(default_factory=_default_ignore_globs)
     watch_debounce_seconds: float = 1.5
+    deployment_mode: str = "standalone"
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AppConfig:
@@ -36,6 +59,7 @@ class AppConfig:
             watched_roots=list(wr) if isinstance(wr, list) else [],
             watch_ignore_globs=list(ig) if isinstance(ig, list) else _default_ignore_globs(),
             watch_debounce_seconds=float(d.get("watch_debounce_seconds", 1.5)),
+            deployment_mode=normalize_deployment_mode(d.get("deployment_mode")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,6 +72,7 @@ class AppConfig:
             "watched_roots": list(self.watched_roots),
             "watch_ignore_globs": list(self.watch_ignore_globs),
             "watch_debounce_seconds": self.watch_debounce_seconds,
+            "deployment_mode": self.deployment_mode,
         }
 
 

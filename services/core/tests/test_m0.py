@@ -57,6 +57,7 @@ def test_config_with_token(client: TestClient, data_dir: Path) -> None:
     body = r.json()
     assert body["chat_model"] == "llama3.2"
     assert body["embed_model"] == "nomic-embed-text"
+    assert body.get("deployment_mode") == "standalone"
 
 
 def test_openapi_json(client: TestClient) -> None:
