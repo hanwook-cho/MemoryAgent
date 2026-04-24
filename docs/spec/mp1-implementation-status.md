@@ -27,6 +27,22 @@ Last recorded local run:
 122 passed
 ```
 
+Last recorded local host + local Edge Node smoke:
+
+```text
+MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL=http://127.0.0.1:9876 ./scripts/mp1-edge-smoke.py
+OK: edge GET /health
+OK: edge POST /ingest kind=memory
+OK: edge POST /retrieve schema
+OK: host PATCH /config host_edge
+OK: host GET /health sees edge reachable
+OK: host /memory/search
+OK: host POST /memory/entries
+OK: host POST /chat remember
+PASS: MP1 real-edge smoke completed
+OK: host config restored
+```
+
 Covered tests:
 
 - [`tests/test_mp1_pr1.py`](../../services/core/tests/test_mp1_pr1.py) — backend contract/config foundation.
