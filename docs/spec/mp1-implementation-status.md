@@ -30,7 +30,10 @@ Last recorded local run:
 Last recorded local host + local Edge Node smoke (persistent Chroma-backed `run-local-edge.py`):
 
 ```text
-MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL=http://127.0.0.1:9876 ./scripts/mp1-edge-smoke.py
+MP1_REQUIRE_RETRIEVE_HITS=1 \
+EDGE_BASE_URL=http://127.0.0.1:9876 \
+MP1_FILE_SMOKE_ROOT="$PWD/.memoryagent-edge-smoke" \
+./scripts/mp1-edge-smoke.py
 OK: edge GET /health
 OK: edge POST /ingest kind=memory
 OK: edge POST /retrieve schema
@@ -39,6 +42,7 @@ OK: host GET /health sees edge reachable
 OK: host /memory/search
 OK: host POST /memory/entries
 OK: host POST /chat remember
+OK: host file ingest path mapping smoke
 PASS: MP1 real-edge smoke completed
 OK: host config restored
 ```
