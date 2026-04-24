@@ -124,7 +124,7 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 | Goal | Automated | Manual / smoke |
 | :--- | :--- | :--- |
 | `host_edge` retrieval | **Integration:** mocked `try_node_retrieve` → `GET /memory/search` returns edge rows after `PATCH` mode+URL (`tests/test_mp1_remote_retrieve.py`) | Real edge Node |
-| Mock Edge Node smoke | **Integration:** local FastAPI mock edge over TCP validates `GET /health`, `POST /retrieve`, `POST /ingest`, host `PATCH /config`, `/memory/search`, `/memory/entries`, and chat “Remember that …” (`tests/test_mp1_mock_edge_smoke.py`) | Real edge Node with same flow |
+| Mock Edge Node smoke | **Integration:** local FastAPI mock edge over TCP validates `GET /health`, `POST /retrieve`, `POST /ingest`, host `PATCH /config`, `/memory/search`, `/memory/entries`, and chat “Remember that …” (`tests/test_mp1_mock_edge_smoke.py`) | Real edge Node with same flow via [`scripts/mp1-edge-smoke.py`](../../scripts/mp1-edge-smoke.py) |
 | Fallback | **Unit:** remote returns `None` → local Chroma hits | — |
 | `hybrid` merge | **Unit:** local + remote merged by best score per `chunk_id` | — |
 | Chat RAG path | **Integration:** existing chat tests with `bind_retrieval_for_chat` | — |

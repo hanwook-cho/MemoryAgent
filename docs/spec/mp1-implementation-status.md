@@ -47,6 +47,25 @@ Before treating MP1 as externally validated, run the same smoke flow against a *
 5. Confirm chat “Remember that …” reaches real Node `POST /ingest` with `source=chat`.
 6. If HTTPS is used, verify `edge_tls_ca_bundle` and, if enabled, `edge_tls_spki_pins_sha256`.
 
+Reusable smoke command (host must already be running):
+
+```bash
+EDGE_BASE_URL="https://edge.example:9443" ./scripts/mp1-edge-smoke.py
+```
+
+Useful variants:
+
+```bash
+# Require retrieve/search to return at least one hit after direct edge ingest.
+MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL="https://edge.example:9443" ./scripts/mp1-edge-smoke.py
+
+# Direct edge checks through a private CA bundle.
+EDGE_BASE_URL="https://edge.example:9443" EDGE_CA_BUNDLE=/path/to/ca.pem ./scripts/mp1-edge-smoke.py
+
+# Lab-only direct edge TLS bypass (host config is still restored at the end).
+EDGE_BASE_URL="https://edge.example:9443" EDGE_INSECURE_SKIP_VERIFY=1 ./scripts/mp1-edge-smoke.py
+```
+
 ## Promotion Status
 
 `ma-dist` → `main` promotion is **HOLD** under current policy because [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) requires phases 0–8, not just MP1 Phase 3. The next eligible action is either:

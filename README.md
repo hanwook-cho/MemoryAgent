@@ -68,6 +68,8 @@ Open **http://127.0.0.1:8765/** — static UI loads from `web/dist`. The first l
 
 **Web dev (Vite proxy):** `cd web && npm run dev` → uses proxy to port 8765; run the core separately.
 
+**MP1 real Edge Node smoke:** with the core running, set `EDGE_BASE_URL` and run `./scripts/mp1-edge-smoke.py` to validate host↔edge `GET /health`, `POST /retrieve`, and `POST /ingest` paths (see [`docs/spec/mp1-implementation-status.md`](docs/spec/mp1-implementation-status.md)).
+
 ## Validated calendar commands
 
 Assuming the server is running, load `TOKEN` from the active data dir:
