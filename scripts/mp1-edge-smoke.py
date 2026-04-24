@@ -67,6 +67,38 @@ def _assert_status(label: str, status: int, allowed: set[int], payload: dict[str
         _die(f"{label}: HTTP {status}: {json.dumps(payload, sort_keys=True)[:500]}")
 
 
+def _host_memory_search(host: str, token: str, query: str) -> dict[str, Any]:
+    status, payload = _json_request(
+        "GET",
+        f"{host}/memory/search?q={urllib.parse.quote(query)}&limit=5",
+        token=token,
+    )
+    _assert_status("host GET /memory/search", status, {200}, payload)
+    results = payload.get("results")
+    if not isinstance(results, list):
+        _die("host /memory/search response missing results array")
+    return payload
+
+
+def _wait_host_memory_hit(
+    host: str,
+    token: str,
+    query: str,
+    *,
+    attempts: int,
+    delay_seconds: float,
+) -> dict[str, Any]:
+    last: dict[str, Any] = {}
+    for i in range(attempts):
+        payload = _host_memory_search(host, token, query)
+        if payload.get("results"):
+            return payload
+        last = payload
+        if i + 1 < attempts:
+            time.sleep(delay_seconds)
+    return last
+
+
 def _retry_retrieve(
     edge_base_url: str,
     edge_token: str,
@@ -162,6 +194,15 @@ def main() -> int:
         default=os.environ.get("EDGE_INSECURE_SKIP_VERIFY") == "1",
         help="Disable TLS verification for direct Edge Node checks (lab only).",
     )
+    ap.add_argument(
+        "--file-smoke-root",
+        default=os.environ.get("MP1_FILE_SMOKE_ROOT"),
+        help=(
+            "Optional shared host/edge directory for file-ingest smoke. "
+            "The script writes a .txt file, patches watched_roots and edge_ingest_path_* "
+            "to this directory, and waits for host /memory/search to find it via edge."
+        ),
+    )
     args = ap.parse_args()
 
     host = args.host_base_url.rstrip("/")
@@ -233,15 +274,8 @@ def main() -> int:
             _die(f"host health edge not reachable/non-degraded: {json.dumps(dep, sort_keys=True)}")
         _ok("host GET /health sees edge reachable")
 
-        status, payload = _json_request(
-            "GET",
-            f"{host}/memory/search?q={urllib.parse.quote(unique)}&limit=5",
-            token=token,
-        )
-        _assert_status("host GET /memory/search", status, {200}, payload)
-        results = payload.get("results")
-        if not isinstance(results, list):
-            _die("host /memory/search response missing results array")
+        payload = _host_memory_search(host, token, unique)
+        results = payload.get("results") or []
         if args.require_retrieve_hits and not results:
             _die("host /memory/search returned no hits")
         _ok("host /memory/search")
@@ -279,6 +313,40 @@ def main() -> int:
             _die(f"host chat returned degraded meta: {json.dumps(meta, sort_keys=True)}")
         _ok("host POST /chat remember")
 
+        if args.file_smoke_root:
+            root = Path(args.file_smoke_root).expanduser().resolve()
+            root.mkdir(parents=True, exist_ok=True)
+            file_unique = f"{unique} file path mapping"
+            f = root / f"{unique}.txt"
+            f.write_text(f"{file_unique}\n", encoding="utf-8")
+
+            watched_roots = list(previous_config.get("watched_roots") or [])
+            root_s = str(root)
+            if root_s not in watched_roots:
+                watched_roots.append(root_s)
+            status, payload = _json_request(
+                "PATCH",
+                f"{host}/config",
+                token=token,
+                body={
+                    "watched_roots": watched_roots,
+                    "watch_debounce_seconds": 0.1,
+                    "edge_ingest_path_host_prefix": root_s,
+                    "edge_ingest_path_edge_prefix": root_s,
+                },
+            )
+            _assert_status("host PATCH /config file edge mapping", status, {200}, payload)
+            payload = _wait_host_memory_hit(
+                host,
+                token,
+                file_unique,
+                attempts=max(5, args.retrieve_attempts),
+                delay_seconds=max(0.5, args.retrieve_delay_seconds),
+            )
+            if not payload.get("results"):
+                _die("host /memory/search returned no file smoke hit after watcher ingest")
+            _ok("host file ingest path mapping smoke")
+
         print("PASS: MP1 real-edge smoke completed")
         return 0
     finally:
@@ -298,6 +366,11 @@ def main() -> int:
                 ),
                 "edge_ingest_path_edge_prefix": previous_config.get(
                     "edge_ingest_path_edge_prefix"
+                ),
+                "watched_roots": previous_config.get("watched_roots", []),
+                "watch_ignore_globs": previous_config.get("watch_ignore_globs", []),
+                "watch_debounce_seconds": previous_config.get(
+                    "watch_debounce_seconds", 1.5
                 ),
             }
             status, payload = _json_request(

@@ -80,6 +80,12 @@ For local development without a real edge deployment, start the persistent local
 
 # Terminal 3: smoke host -> local edge
 MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL="http://127.0.0.1:9876" ./scripts/mp1-edge-smoke.py
+
+# Optional: include host watcher -> edge kind=file path mapping
+MP1_REQUIRE_RETRIEVE_HITS=1 \
+  EDGE_BASE_URL="http://127.0.0.1:9876" \
+  MP1_FILE_SMOKE_ROOT="$PWD/.memoryagent-edge-smoke" \
+  ./scripts/mp1-edge-smoke.py
 ```
 
 `run-local-edge.py` reads the same bearer token from `.memoryagent/secrets/bearer.token` by default. Its edge index is Chroma-backed and persists under `.memoryagent-edge/` unless `--edge-data-dir` points elsewhere. It uses Ollama embeddings by default (`OLLAMA_BASE_URL`, `EMBED_MODEL`) and supports `--deterministic-embedder` for isolated dev/test runs.

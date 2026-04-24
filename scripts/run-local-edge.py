@@ -35,7 +35,7 @@ from fastapi import FastAPI, HTTPException, Request
 
 from memoryagent.embeddings import DeterministicEmbedder, OllamaEmbedder
 from memoryagent.llm_client import FakeLlm
-from memoryagent.rag_service import RagService, SearchFilters
+from memoryagent.rag_service import RagService, SearchFilters, _meta_matches_filters
 from memoryagent.vector_store import VectorStore
 
 
@@ -180,24 +180,34 @@ def create_app(*, token: str | None, node_id: str, state: EdgeState) -> FastAPI:
             limit = max(1, int(body.get("limit") or 8))
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail=_error("VALIDATION", "limit must be an integer")) from None
-        hits = await state.rag.search(
-            query,
-            limit=limit,
-            filters=_filters_from_node_payload(body),
+        filters = _filters_from_node_payload(body)
+        qemb = await state.rag._embedder.embed(query)
+        raw_hits = state.store.query_with_filters(
+            qemb,
+            n_results=min(limit * 4, max(1, state.store.count())),
+            where={"source_kind": {"$eq": filters.source_kind}}
+            if filters.source_kind
+            else None,
         )
-        rows = [
-            {
-                "chunk_id": h.chunk_id,
-                "document_id": h.document_id,
-                "snippet": h.snippet,
-                "score": h.score,
-                "source": "local_dev_edge",
-                "source_kind": "memory",
-                "indexed_at": datetime.now().astimezone().isoformat(),
-                "backend_id": "local_dev_edge",
-            }
-            for h in hits
-        ]
+        rows: list[dict[str, Any]] = []
+        for row in raw_hits:
+            meta = row.get("metadata") or {}
+            if not _meta_matches_filters(meta, filters):
+                continue
+            rows.append(
+                {
+                    "chunk_id": str(row.get("chunk_id", "")),
+                    "document_id": str(meta.get("document_id", "")),
+                    "snippet": str(row.get("document") or "")[:500],
+                    "score": float(row.get("score", 0.0)),
+                    "source": str(meta.get("source", "")),
+                    "source_kind": str(meta.get("source_kind", "")),
+                    "indexed_at": str(meta.get("indexed_at", "")),
+                    "backend_id": "local_dev_edge",
+                }
+            )
+            if len(rows) >= limit:
+                break
         return {
             "results": rows,
             "meta": {
