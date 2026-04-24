@@ -4,18 +4,33 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def _reexec_with_core_venv() -> None:
+    """Use the core venv so script deps (`fastapi`, `uvicorn`) are available."""
+    if os.environ.get("MEMORYAGENT_SKIP_VENV_REEXEC") == "1":
+        return
+    venv_py = _repo_root() / "services" / "core" / ".venv" / "bin" / "python"
+    if venv_py.is_file() and Path(sys.executable).absolute() != venv_py.absolute():
+        os.environ["MEMORYAGENT_SKIP_VENV_REEXEC"] = "1"
+        os.execv(str(venv_py), [str(venv_py), *sys.argv])
+
+
+_reexec_with_core_venv()
+
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
 
 
 def _bearer_token_path(data_dir: Path) -> Path:
