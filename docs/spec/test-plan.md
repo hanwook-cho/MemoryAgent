@@ -124,6 +124,7 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 | Goal | Automated | Manual / smoke |
 | :--- | :--- | :--- |
 | `host_edge` retrieval | **Integration:** mocked `try_node_retrieve` → `GET /memory/search` returns edge rows after `PATCH` mode+URL (`tests/test_mp1_remote_retrieve.py`) | Real edge Node |
+| Mock Edge Node smoke | **Integration:** local FastAPI mock edge over TCP validates `GET /health`, `POST /retrieve`, `POST /ingest`, host `PATCH /config`, `/memory/search`, `/memory/entries`, and chat “Remember that …” (`tests/test_mp1_mock_edge_smoke.py`) | Real edge Node with same flow |
 | Fallback | **Unit:** remote returns `None` → local Chroma hits | — |
 | `hybrid` merge | **Unit:** local + remote merged by best score per `chunk_id` | — |
 | Chat RAG path | **Integration:** existing chat tests with `bind_retrieval_for_chat` | — |
@@ -134,7 +135,7 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 | Edge TLS verify helper | **Unit:** [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) | — |
 | SPKI pinning | **Unit:** SPKI digest + `PinningSSLContext` / proxy handshake (`tests/test_edge_http.py`) | Lab edge with known leaf key |
 
-**Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py) and [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) green.
+**Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py), [`tests/test_mp1_mock_edge_smoke.py`](../../services/core/tests/test_mp1_mock_edge_smoke.py), and [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) green.
 
 ## 8. Optional — Native shell
 
