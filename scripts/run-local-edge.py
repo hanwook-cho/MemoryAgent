@@ -22,10 +22,9 @@ def _reexec_with_core_venv() -> None:
     if os.environ.get("MEMORYAGENT_SKIP_VENV_REEXEC") == "1":
         return
     venv_py = _repo_root() / "services" / "core" / ".venv" / "bin" / "python"
-    if venv_py.is_file() and Path(sys.executable).absolute() != venv_py.absolute():
+    if venv_py.is_file() and Path(sys.executable) != venv_py:
         os.environ["MEMORYAGENT_SKIP_VENV_REEXEC"] = "1"
         os.execv(str(venv_py), [str(venv_py), *sys.argv])
-
 
 _reexec_with_core_venv()
 
