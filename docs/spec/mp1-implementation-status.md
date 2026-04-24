@@ -27,7 +27,7 @@ Last recorded local run:
 122 passed
 ```
 
-Last recorded local host + local Edge Node smoke:
+Last recorded local host + local Edge Node smoke (persistent Chroma-backed `run-local-edge.py`):
 
 ```text
 MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL=http://127.0.0.1:9876 ./scripts/mp1-edge-smoke.py
