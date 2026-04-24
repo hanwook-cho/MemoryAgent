@@ -101,6 +101,25 @@ async def test_ingest_file_path_searchable(data_dir: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_ingest_text_file_replaces_invalid_utf8(data_dir: Path) -> None:
+    f = data_dir / "latinish.md"
+    f.write_bytes(b"M2 invalid utf8 marker: zephyr-\xbd\n")
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="ok"),
+    )
+
+    await rag.ingest_file_path(f)
+    results = await rag.search("invalid utf8 marker")
+    assert results
+    assert "zephyr" in results[0].snippet.lower()
+
+
+@pytest.mark.asyncio
 async def test_ingest_pdf_path_searchable_with_mock_reader(
     data_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

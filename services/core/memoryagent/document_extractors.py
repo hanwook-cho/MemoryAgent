@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from pypdf import PdfReader
 from docx import Document
+
+logger = logging.getLogger(__name__)
 
 MAX_BYTES_BY_SUFFIX: dict[str, int] = {
     ".md": 2 * 1024 * 1024,
@@ -26,7 +29,7 @@ def extract_text_from_path(path: Path) -> tuple[str, str]:
     suf = p.suffix.lower()
     _validate_size_limit(p, suf)
     if suf in (".md", ".txt"):
-        return p.read_text(encoding="utf-8"), "file"
+        return _read_text_lossy_utf8(p), "file"
     if suf == ".pdf":
         text = _extract_pdf_text(p)
         return text, "file_pdf"
@@ -34,6 +37,19 @@ def extract_text_from_path(path: Path) -> tuple[str, str]:
         text = _extract_docx_text(p)
         return text, "file_docx"
     raise ValueError(f"unsupported file type: {suf}")
+
+
+def _read_text_lossy_utf8(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        logger.warning(
+            "text_decode_failed path=%s encoding=utf-8 byte_offset=%s; "
+            "ingesting with replacement characters",
+            path,
+            e.start,
+        )
+        return path.read_text(encoding="utf-8", errors="replace")
 
 
 def _extract_pdf_text(path: Path) -> str:
