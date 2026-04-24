@@ -57,6 +57,10 @@ class ConfigPatchRequest(BaseModel):
     watch_debounce_seconds: float | None = Field(default=None, ge=0.1, le=3600.0)
     deployment_mode: str | None = None
     edge_base_url: str | None = None
+    edge_tls_ca_bundle: str | None = None
+    edge_tls_insecure_skip_verify: bool | None = None
+    edge_ingest_path_host_prefix: str | None = None
+    edge_ingest_path_edge_prefix: str | None = None
 
 
 MirrorId = Literal["user", "soul"]

@@ -44,7 +44,7 @@ Response `200`:
 }
 ```
 
-- **`deployment`:** reflects `deployment_mode` from config (see `GET/PATCH /config`). When the mode is not `standalone`, **`degraded`** is **`true`** until remote retrieval/ingest is implemented; **`degraded_reason`** is a short machine-oriented explanation for clients to surface in UI or logs.
+- **`deployment`:** reflects `deployment_mode` from config (see `GET/PATCH /config`). When the mode is not `standalone`, **`degraded`** is **`true`** if the edge URL is missing or `GET /health` on the edge fails; **`degraded_reason`** is a short machine-oriented explanation for clients to surface in UI or logs.
 
 `backend` identifies the runtime in use (e.g. `ollama`, `mlx_lm` / `mlx-lm`, `llamacpp`).
 
@@ -127,11 +127,11 @@ Optional filters:
 
 ### 3.7 Configuration (read)
 
-`GET /config` — safe subset (no secrets): watched paths, model names, feature flags, `deployment_mode`, optional `edge_base_url` (HTTPS edge Node base URL for distributed modes).
+`GET /config` — safe subset (no secrets): watched paths, model names, feature flags, `deployment_mode`, optional `edge_base_url` (HTTPS edge Node base URL for distributed modes), optional edge TLS fields (`edge_tls_ca_bundle`, `edge_tls_insecure_skip_verify`), optional host→edge path prefixes for remote file ingest (`edge_ingest_path_host_prefix`, `edge_ingest_path_edge_prefix`).
 
 ### 3.8 Configuration (write)
 
-`PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`, `deployment_mode`, `edge_base_url` (empty string clears `edge_base_url`).
+`PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`, `deployment_mode`, `edge_base_url` (empty string clears `edge_base_url`), the edge TLS and `edge_ingest_path_*` fields above. Changing any of those edge-related keys rebinds retrieval/ingest clients in-process.
 
 ### 3.9 Markdown mirror
 

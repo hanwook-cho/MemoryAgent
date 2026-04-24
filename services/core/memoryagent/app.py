@@ -24,8 +24,10 @@ from memoryagent.config_store import (
     AppConfig,
     load_config,
     normalize_edge_base_url,
+    optional_config_string,
     save_config,
 )
+from memoryagent.edge_http import edge_httpx_verify
 from memoryagent.deployment_runtime import chat_meta_block, health_deployment_block
 from memoryagent.embeddings import DeterministicEmbedder, Embedder, OllamaEmbedder
 from memoryagent.folder_picker import pick_folder_macos
@@ -63,6 +65,17 @@ logger = logging.getLogger(__name__)
 
 API_PREFIX = "/api/v1"
 
+_MP1_BACKEND_PATCH_FIELDS = frozenset(
+    {
+        "deployment_mode",
+        "edge_base_url",
+        "edge_tls_ca_bundle",
+        "edge_tls_insecure_skip_verify",
+        "edge_ingest_path_host_prefix",
+        "edge_ingest_path_edge_prefix",
+    }
+)
+
 _MIRROR_TITLES: dict[str, str] = {
     "user": "USER memory",
     "soul": "Soul / identity",
@@ -95,6 +108,7 @@ def create_app(
 
     backends = build_runtime_backends(rag, cfg, bearer_token=bearer_token)
     rag.bind_retrieval_for_chat(backends.retrieval)
+    rag.bind_ingest_for_routing(backends.ingest)
     retrieval = backends.retrieval
     ingest = backends.ingest
 
@@ -109,7 +123,11 @@ def create_app(
         edge = c.edge_base_url
         if not edge:
             return None, None
-        return await fetch_edge_health(edge, bearer_token=bearer_token)
+        return await fetch_edge_health(
+            edge,
+            bearer_token=bearer_token,
+            verify=edge_httpx_verify(c),
+        )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -184,6 +202,10 @@ def create_app(
             "watch_debounce_seconds": c.watch_debounce_seconds,
             "deployment_mode": c.deployment_mode,
             "edge_base_url": c.edge_base_url,
+            "edge_tls_ca_bundle": c.edge_tls_ca_bundle,
+            "edge_tls_insecure_skip_verify": c.edge_tls_insecure_skip_verify,
+            "edge_ingest_path_host_prefix": c.edge_ingest_path_host_prefix,
+            "edge_ingest_path_edge_prefix": c.edge_ingest_path_edge_prefix,
             "ui": {
                 "chat_welcome_dismissed": False,
                 "chat_welcome_version": "3",
@@ -229,12 +251,26 @@ def create_app(
             c.deployment_mode = body.deployment_mode
         if body.edge_base_url is not None:
             c.edge_base_url = normalize_edge_base_url(body.edge_base_url)
+        fs = body.model_fields_set
+        if "edge_tls_ca_bundle" in fs:
+            c.edge_tls_ca_bundle = optional_config_string(body.edge_tls_ca_bundle)
+        if "edge_tls_insecure_skip_verify" in fs:
+            c.edge_tls_insecure_skip_verify = bool(body.edge_tls_insecure_skip_verify)
+        if "edge_ingest_path_host_prefix" in fs:
+            c.edge_ingest_path_host_prefix = optional_config_string(
+                body.edge_ingest_path_host_prefix
+            )
+        if "edge_ingest_path_edge_prefix" in fs:
+            c.edge_ingest_path_edge_prefix = optional_config_string(
+                body.edge_ingest_path_edge_prefix
+            )
         save_config(data_dir, c)
-        if body.deployment_mode is not None or body.edge_base_url is not None:
+        if fs & _MP1_BACKEND_PATCH_FIELDS:
             backends = build_runtime_backends(rag, c, bearer_token=bearer_token)
             retrieval = backends.retrieval
             ingest = backends.ingest
             rag.bind_retrieval_for_chat(retrieval)
+            rag.bind_ingest_for_routing(ingest)
             app.state.mp1_backends = backends
         watcher.restart(asyncio.get_running_loop(), load_config(data_dir))
         return await get_config()

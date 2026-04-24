@@ -14,6 +14,7 @@ async def fetch_edge_health(
     *,
     bearer_token: str,
     timeout_seconds: float = 3.0,
+    verify: bool | str = True,
 ) -> tuple[bool, str | None]:
     """
     ``GET {base}/health`` per Node API §5.1 (``docs/spec/node-api.md``).
@@ -23,7 +24,7 @@ async def fetch_edge_health(
     root = base_url.rstrip("/")
     url = f"{root}/health"
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds, verify=verify) as client:
             r = await client.get(
                 url,
                 headers={"Authorization": f"Bearer {bearer_token}"},

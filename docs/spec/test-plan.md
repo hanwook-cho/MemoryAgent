@@ -128,8 +128,12 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 | `hybrid` merge | **Unit:** local + remote merged by best score per `chunk_id` | — |
 | Chat RAG path | **Integration:** existing chat tests with `bind_retrieval_for_chat` | — |
 | Remote memory ingest | **Integration:** `POST /memory/entries` with `host_edge` + mocked `try_node_ingest_memory` (`tests/test_mp1_remote_retrieve.py`) | Real edge |
+| Chat / tools ingest | **Integration:** `POST /chat` “Remember that …” under `host_edge` + mock (`tests/test_mp1_remote_retrieve.py`); `RagService` routes via `bind_ingest_for_routing` | — |
+| Remote file ingest (mapped) | **Unit:** `HostEdgeIngestBackend` + mocked `try_node_ingest_file` when path maps (`tests/test_mp1_remote_retrieve.py`) | Real edge + shared filesystem contract |
+| Hybrid memory ingest | **Unit:** background `try_node_ingest_memory` after local (`tests/test_mp1_remote_retrieve.py`) | — |
+| Edge TLS verify helper | **Unit:** [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) | — |
 
-**Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py) green.
+**Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py) and [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) green.
 
 ## 8. Optional — Native shell
 

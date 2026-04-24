@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 import asyncio
 
 if TYPE_CHECKING:
-    from memoryagent.backends import RetrievalBackend
+    from memoryagent.backends import IngestBackend, RetrievalBackend
 
 from memoryagent.calendar_bridge import (
     CalendarPermissionDenied,
@@ -58,10 +58,15 @@ class RagService:
         self._stats_path = data_dir / "store" / "ingest_stats.json"
         self._file_index = FileIndexDB(data_dir / "store" / "file_index.db")
         self._retrieval_for_chat: RetrievalBackend | None = None
+        self._ingest_router: IngestBackend | None = None
 
     def bind_retrieval_for_chat(self, backend: "RetrievalBackend") -> None:
         """MP1: use the same ``RetrievalBackend`` as HTTP ``/memory/search`` for RAG chat retrieval."""
         self._retrieval_for_chat = backend
+
+    def bind_ingest_for_routing(self, backend: "IngestBackend") -> None:
+        """MP1: route ``ingest_*`` through the same ``IngestBackend`` as HTTP (chat saves, watcher)."""
+        self._ingest_router = backend
 
     @property
     def llm_client(self) -> LlmClient:
@@ -130,6 +135,17 @@ class RagService:
         tags: list[str],
         source: str,
     ) -> tuple[str, str]:
+        if self._ingest_router is not None:
+            return await self._ingest_router.ingest_memory(text, tags=tags, source=source)
+        return await self._ingest_memory_local(text, tags=tags, source=source)
+
+    async def _ingest_memory_local(
+        self,
+        text: str,
+        *,
+        tags: list[str],
+        source: str,
+    ) -> tuple[str, str]:
         document_id = str(uuid.uuid4())
         chunks = chunk_text(text)
         if not chunks:
@@ -169,6 +185,12 @@ class RagService:
 
     async def ingest_file_path(self, path: Path) -> str:
         """Extract text from supported file, replace prior chunks, embed, upsert."""
+        if self._ingest_router is not None:
+            return await self._ingest_router.ingest_file_path(path)
+        return await self._ingest_file_path_local(path)
+
+    async def _ingest_file_path_local(self, path: Path) -> str:
+        """Host-local file ingest (used by ``IngestBackend`` implementations)."""
         p = path.expanduser().resolve()
         if not p.is_file():
             raise FileNotFoundError(str(p))
@@ -262,6 +284,14 @@ class RagService:
 
     async def ingest_mirror_document(self, path: Path, *, mirror_key: str) -> str:
         """Index only the Markdown body (below front matter); metadata marks `mirror` source."""
+        if self._ingest_router is not None:
+            return await self._ingest_router.ingest_mirror_document(
+                path, mirror_key=mirror_key
+            )
+        return await self._ingest_mirror_document_local(path, mirror_key=mirror_key)
+
+    async def _ingest_mirror_document_local(self, path: Path, *, mirror_key: str) -> str:
+        """Host-local mirror ingest (used by ``IngestBackend`` implementations)."""
         p = path.expanduser().resolve()
         if not p.is_file():
             raise FileNotFoundError(str(p))

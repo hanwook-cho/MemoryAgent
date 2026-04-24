@@ -86,8 +86,14 @@ def test_health_not_degraded_when_host_edge_and_edge_ping_ok(
 ) -> None:
     import memoryagent.app as app_mod
 
-    async def ok_edge(_url: str, *, bearer_token: str, timeout_seconds: float = 3.0) -> tuple[bool, str | None]:
-        _ = bearer_token, timeout_seconds
+    async def ok_edge(
+        _url: str,
+        *,
+        bearer_token: str,
+        timeout_seconds: float = 3.0,
+        verify: bool | str = True,
+    ) -> tuple[bool, str | None]:
+        _ = bearer_token, timeout_seconds, verify
         return True, None
 
     monkeypatch.setattr(app_mod, "fetch_edge_health", ok_edge)

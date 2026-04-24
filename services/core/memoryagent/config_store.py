@@ -51,6 +51,16 @@ def _default_ignore_globs() -> list[str]:
     return ["**/.git/**", "**/node_modules/**", "**/.DS_Store"]
 
 
+def optional_config_string(raw: Any) -> str | None:
+    """Normalize optional JSON string fields (``None`` / empty → ``None``)."""
+    if raw is None or raw == "":
+        return None
+    if not isinstance(raw, str):
+        return None
+    s = raw.strip()
+    return s or None
+
+
 @dataclass
 class AppConfig:
     host: str = "127.0.0.1"
@@ -63,11 +73,18 @@ class AppConfig:
     watch_debounce_seconds: float = 1.5
     deployment_mode: str = "standalone"
     edge_base_url: str | None = None
+    # Edge TLS (httpx verify=): optional PEM CA bundle; insecure skip for lab only.
+    edge_tls_ca_bundle: str | None = None
+    edge_tls_insecure_skip_verify: bool = False
+    # When both set, host files under host_prefix map to edge paths for POST /ingest kind=file.
+    edge_ingest_path_host_prefix: str | None = None
+    edge_ingest_path_edge_prefix: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AppConfig:
         wr = d.get("watched_roots")
         ig = d.get("watch_ignore_globs")
+        insecure = d.get("edge_tls_insecure_skip_verify", False)
         return cls(
             host=d.get("host", cls.host),
             port=int(d.get("port", cls.port)),
@@ -79,6 +96,14 @@ class AppConfig:
             watch_debounce_seconds=float(d.get("watch_debounce_seconds", 1.5)),
             deployment_mode=normalize_deployment_mode(d.get("deployment_mode")),
             edge_base_url=normalize_edge_base_url(d.get("edge_base_url")),
+            edge_tls_ca_bundle=optional_config_string(d.get("edge_tls_ca_bundle")),
+            edge_tls_insecure_skip_verify=bool(insecure),
+            edge_ingest_path_host_prefix=optional_config_string(
+                d.get("edge_ingest_path_host_prefix")
+            ),
+            edge_ingest_path_edge_prefix=optional_config_string(
+                d.get("edge_ingest_path_edge_prefix")
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -97,6 +122,13 @@ class AppConfig:
             d["edge_base_url"] = self.edge_base_url
         else:
             d["edge_base_url"] = None
+        if self.edge_tls_ca_bundle:
+            d["edge_tls_ca_bundle"] = self.edge_tls_ca_bundle
+        else:
+            d["edge_tls_ca_bundle"] = None
+        d["edge_tls_insecure_skip_verify"] = self.edge_tls_insecure_skip_verify
+        d["edge_ingest_path_host_prefix"] = self.edge_ingest_path_host_prefix
+        d["edge_ingest_path_edge_prefix"] = self.edge_ingest_path_edge_prefix
         return d
 
 

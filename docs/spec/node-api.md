@@ -22,6 +22,7 @@ It is not intended for direct end-user clients.
 - Transport: **HTTPS REST** (Decision D2)
 - Auth: **Bearer token over TLS** baseline (Decision D3)
 - mTLS: optional future hardening, not required in v1
+- **Host backend TLS to Node:** the Python host may set a custom CA bundle (`edge_tls_ca_bundle`), or `edge_tls_insecure_skip_verify` for lab only; see `GET/PATCH /config` in [`client-api.md`](client-api.md). Certificate / SPKI pinning beyond CA trust is not implemented in the host client yet.
 
 ## 3. Base URL and versioning
 

@@ -63,11 +63,12 @@ async def post_node_retrieve(
     payload: dict[str, Any],
     *,
     timeout_seconds: float = 30.0,
+    verify: bool | str = True,
 ) -> dict[str, Any]:
     """POST ``{edge}/retrieve``; raises on non-2xx or network error."""
     root = edge_base_url.rstrip("/")
     url = f"{root}/retrieve"
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+    async with httpx.AsyncClient(timeout=timeout_seconds, verify=verify) as client:
         r = await client.post(
             url,
             headers={
@@ -91,6 +92,7 @@ async def try_node_retrieve(
     *,
     limit: int = 20,
     filters: SearchFilters | None = None,
+    verify: bool | str = True,
 ) -> list[SearchResultItem] | None:
     """
     Returns parsed results, or ``None`` if the request should fall back to local
@@ -98,7 +100,9 @@ async def try_node_retrieve(
     """
     payload = _filters_to_node_payload(query, limit, filters)
     try:
-        data = await post_node_retrieve(edge_base_url, bearer_token, payload)
+        data = await post_node_retrieve(
+            edge_base_url, bearer_token, payload, verify=verify
+        )
     except (httpx.HTTPError, OSError, RuntimeError, ValueError, TypeError) as e:
         logger.warning("edge retrieve failed: %s", e)
         return None

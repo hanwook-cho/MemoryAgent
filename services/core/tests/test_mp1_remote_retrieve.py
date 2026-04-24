@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from memoryagent.backends import (
     LocalRagRetrievalBackend,
     build_runtime_backends,
 )
+from memoryagent.edge_http import edge_mapped_file_ingest_path
 from memoryagent.config_store import AppConfig
 from memoryagent.embeddings import DeterministicEmbedder
 from memoryagent.llm_client import FakeLlm
@@ -80,8 +82,9 @@ async def test_host_edge_retrieval_uses_remote_results(
         *,
         limit: int = 20,
         filters: SearchFilters | None = None,
+        verify: bool | str = True,
     ) -> list[SearchResultItem] | None:
-        _ = edge_base_url, bearer_token, limit, filters
+        _ = edge_base_url, bearer_token, limit, filters, verify
         assert query == "hello-remote"
         return [
             SearchResultItem(
@@ -242,8 +245,9 @@ async def test_host_edge_ingest_pushes_memory_after_local(
         tags: list[str],
         source: str,
         timeout_seconds: float = 30.0,
+        verify: bool | str = True,
     ) -> bool:
-        _ = edge_base_url, bearer_token, timeout_seconds
+        _ = edge_base_url, bearer_token, timeout_seconds, verify
         pushed.append((text, tuple(tags), source))
         return True
 
@@ -276,8 +280,9 @@ def test_post_memory_host_edge_calls_remote_ingest(
         tags: list[str],
         source: str,
         timeout_seconds: float = 30.0,
+        verify: bool | str = True,
     ) -> bool:
-        _ = edge_base_url, bearer_token, tags, timeout_seconds
+        _ = edge_base_url, bearer_token, tags, timeout_seconds, verify
         pushed.append(text)
         return True
 
@@ -363,3 +368,158 @@ def test_build_runtime_backends_standalone_is_local(data_dir: Path) -> None:
     b = build_runtime_backends(rag, cfg, bearer_token="abc")
     assert isinstance(b.retrieval, LocalRagRetrievalBackend)
     assert isinstance(b.ingest, LocalRagIngestBackend)
+
+
+async def test_hybrid_ingest_memory_pushes_edge_in_background(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="x"),
+    )
+    done = asyncio.Event()
+
+    async def fake_ingest(
+        edge_base_url: str,
+        bearer_token: str,
+        *,
+        text: str,
+        tags: list[str],
+        source: str,
+        timeout_seconds: float = 30.0,
+        verify: bool | str = True,
+    ) -> bool:
+        _ = edge_base_url, bearer_token, tags, timeout_seconds, verify
+        done.set()
+        return True
+
+    import memoryagent.backends as backends_mod
+
+    monkeypatch.setattr(backends_mod, "try_node_ingest_memory", fake_ingest)
+    be = HybridIngestBackend(rag, "http://127.0.0.1:9", "tok")
+    await be.ingest_memory("bg-line", tags=[], source="pytest")
+    await asyncio.wait_for(done.wait(), timeout=2.0)
+
+
+async def test_host_edge_file_ingest_maps_path_for_edge(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "syncroot"
+    root.mkdir()
+    f = root / "note.txt"
+    f.write_text("indexed for edge path map")
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="x"),
+    )
+    pushed: list[str] = []
+
+    async def fake_file(
+        edge_base_url: str,
+        bearer_token: str,
+        *,
+        path: str,
+        timeout_seconds: float = 120.0,
+        verify: bool | str = True,
+        force_reindex: bool = False,
+    ) -> bool:
+        _ = edge_base_url, bearer_token, timeout_seconds, verify, force_reindex
+        pushed.append(path)
+        return True
+
+    import memoryagent.backends as backends_mod
+
+    monkeypatch.setattr(backends_mod, "try_node_ingest_file", fake_file)
+    be = HostEdgeIngestBackend(
+        rag,
+        "http://127.0.0.1:9",
+        "tok",
+        edge_path_host_root=root.resolve(),
+        edge_path_edge_prefix="/data/edge",
+    )
+    await be.ingest_file_path(f)
+    assert pushed == ["/data/edge/note.txt"]
+
+
+def test_edge_mapped_file_ingest_path_relative_to_host_root(tmp_path: Path) -> None:
+    root = tmp_path / "h"
+    root.mkdir()
+    f = root / "a" / "b.txt"
+    f.parent.mkdir()
+    f.write_text("x")
+    mapped = edge_mapped_file_ingest_path(
+        f, host_root=root.resolve(), edge_root="/edge/root"
+    )
+    assert mapped == "/edge/root/a/b.txt"
+
+
+def test_chat_remember_host_edge_calls_remote_ingest(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import memoryagent.app as app_mod
+
+    async def fake_ollama(_: str) -> bool:
+        return False
+
+    monkeypatch.setattr(app_mod, "ollama_reachable", fake_ollama)
+
+    pushed: list[str] = []
+
+    async def fake_ingest(
+        edge_base_url: str,
+        bearer_token: str,
+        *,
+        text: str,
+        tags: list[str],
+        source: str,
+        timeout_seconds: float = 30.0,
+        verify: bool | str = True,
+    ) -> bool:
+        _ = edge_base_url, bearer_token, tags, timeout_seconds, verify
+        pushed.append(text)
+        return True
+
+    import memoryagent.backends as backends_mod
+
+    monkeypatch.setattr(backends_mod, "try_node_ingest_memory", fake_ingest)
+
+    chroma_dir = data_dir / "store" / "vector" / "chroma"
+    rag = RagService(
+        data_dir=data_dir,
+        store=VectorStore(chroma_dir),
+        embedder=DeterministicEmbedder(),
+        llm=FakeLlm(reply="Saved."),
+    )
+    empty = data_dir / "no_web_chat_edge"
+    empty.mkdir()
+    app = create_app(
+        data_dir=data_dir,
+        static_dir=empty,
+        rag_service=rag,
+        file_watcher=NullFileWatcher(),
+    )
+    client = TestClient(app)
+    h = _auth(data_dir)
+    client.patch(
+        "/api/v1/config",
+        headers=h,
+        json={
+            "deployment_mode": "host_edge",
+            "edge_base_url": "https://mock-edge.local",
+        },
+    )
+    secret = "chat-edge-ingest-token-9911"
+    r = client.post(
+        "/api/v1/chat",
+        headers=h,
+        json={"messages": [{"role": "user", "content": f"Remember that {secret}"}]},
+    )
+    assert r.status_code == 200
+    assert pushed and secret in pushed[0]
