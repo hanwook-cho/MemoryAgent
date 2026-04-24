@@ -132,6 +132,7 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 | Remote file ingest (mapped) | **Unit:** `HostEdgeIngestBackend` + mocked `try_node_ingest_file` when path maps (`tests/test_mp1_remote_retrieve.py`) | Real edge + shared filesystem contract |
 | Hybrid memory ingest | **Unit:** background `try_node_ingest_memory` after local (`tests/test_mp1_remote_retrieve.py`) | — |
 | Edge TLS verify helper | **Unit:** [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) | — |
+| SPKI pinning | **Unit:** SPKI digest + `PinningSSLContext` / proxy handshake (`tests/test_edge_http.py`) | Lab edge with known leaf key |
 
 **Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py) and [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) green.
 

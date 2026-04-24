@@ -6,6 +6,8 @@ import logging
 
 import httpx
 
+from memoryagent.edge_http import SslVerifyArg
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,7 +16,7 @@ async def fetch_edge_health(
     *,
     bearer_token: str,
     timeout_seconds: float = 3.0,
-    verify: bool | str = True,
+    verify: SslVerifyArg = True,
 ) -> tuple[bool, str | None]:
     """
     ``GET {base}/health`` per Node API §5.1 (``docs/spec/node-api.md``).

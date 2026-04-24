@@ -12,6 +12,7 @@ dependencies = [
   "fastapi>=0.109",
   "uvicorn[standard]>=0.27",
   "httpx>=0.26",
+  "cryptography>=42.0",
   "chromadb>=0.5",
   "pydantic>=2.9",
   "watchdog>=4.0",

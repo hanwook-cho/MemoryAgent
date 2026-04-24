@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from memoryagent.config_store import AppConfig
-from memoryagent.edge_http import edge_httpx_verify, edge_mapped_file_ingest_path, resolved_edge_path_host_root
+from memoryagent.edge_http import (
+    SslVerifyArg,
+    edge_httpx_verify,
+    edge_mapped_file_ingest_path,
+    resolved_edge_path_host_root,
+)
 from memoryagent.llm_client import LlmClient
 from memoryagent.rag_service import RagService, SearchFilters
 from memoryagent.remote_ingest import try_node_ingest_file, try_node_ingest_memory
@@ -92,12 +97,12 @@ class HostEdgeRetrievalBackend:
         edge_base_url: str,
         bearer_token: str,
         *,
-        verify: bool | str = True,
+        verify: SslVerifyArg = True,
     ) -> None:
         self._rag = rag
         self._edge_base_url = edge_base_url.rstrip("/")
         self._bearer_token = bearer_token
-        self._verify = verify
+        self._verify: SslVerifyArg = verify
 
     def index_stats(self) -> dict[str, int]:
         return self._rag.index_stats()
@@ -148,12 +153,12 @@ class HybridRetrievalBackend:
         edge_base_url: str,
         bearer_token: str,
         *,
-        verify: bool | str = True,
+        verify: SslVerifyArg = True,
     ) -> None:
         self._rag = rag
         self._edge_base_url = edge_base_url.rstrip("/")
         self._bearer_token = bearer_token
-        self._verify = verify
+        self._verify: SslVerifyArg = verify
 
     def index_stats(self) -> dict[str, int]:
         return self._rag.index_stats()
@@ -227,14 +232,14 @@ class HostEdgeIngestBackend:
         edge_base_url: str,
         bearer_token: str,
         *,
-        verify: bool | str = True,
+        verify: SslVerifyArg = True,
         edge_path_host_root: Path | None = None,
         edge_path_edge_prefix: str | None = None,
     ) -> None:
         self._rag = rag
         self._edge_base_url = edge_base_url.rstrip("/")
         self._bearer_token = bearer_token
-        self._verify = verify
+        self._verify: SslVerifyArg = verify
         self._edge_path_host_root = edge_path_host_root
         self._edge_path_edge_prefix = edge_path_edge_prefix
 

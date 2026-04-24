@@ -24,6 +24,7 @@ from memoryagent.config_store import (
     AppConfig,
     load_config,
     normalize_edge_base_url,
+    normalize_edge_spki_pins_sha256,
     optional_config_string,
     save_config,
 )
@@ -206,6 +207,7 @@ def create_app(
             "edge_tls_insecure_skip_verify": c.edge_tls_insecure_skip_verify,
             "edge_ingest_path_host_prefix": c.edge_ingest_path_host_prefix,
             "edge_ingest_path_edge_prefix": c.edge_ingest_path_edge_prefix,
+            "edge_tls_spki_pins_sha256": list(c.edge_tls_spki_pins_sha256),
             "ui": {
                 "chat_welcome_dismissed": False,
                 "chat_welcome_version": "3",
@@ -263,6 +265,10 @@ def create_app(
         if "edge_ingest_path_edge_prefix" in fs:
             c.edge_ingest_path_edge_prefix = optional_config_string(
                 body.edge_ingest_path_edge_prefix
+            )
+        if "edge_tls_spki_pins_sha256" in fs:
+            c.edge_tls_spki_pins_sha256 = normalize_edge_spki_pins_sha256(
+                body.edge_tls_spki_pins_sha256
             )
         save_config(data_dir, c)
         if fs & _MP1_BACKEND_PATCH_FIELDS:

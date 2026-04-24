@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from memoryagent.edge_http import SslVerifyArg
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,7 @@ async def try_node_ingest_memory(
     tags: list[str],
     source: str,
     timeout_seconds: float = 30.0,
-    verify: bool | str = True,
+    verify: SslVerifyArg = True,
 ) -> bool:
     """
     POST ``{edge}/ingest`` with ``kind: memory``.
@@ -58,7 +60,7 @@ async def try_node_ingest_file(
     *,
     path: str,
     timeout_seconds: float = 120.0,
-    verify: bool | str = True,
+    verify: SslVerifyArg = True,
     force_reindex: bool = False,
 ) -> bool:
     """

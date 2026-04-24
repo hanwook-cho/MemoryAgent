@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from memoryagent.edge_http import SslVerifyArg
 from memoryagent.rag_service import SearchFilters
 from memoryagent.schemas import SearchResultItem
 
@@ -63,7 +64,7 @@ async def post_node_retrieve(
     payload: dict[str, Any],
     *,
     timeout_seconds: float = 30.0,
-    verify: bool | str = True,
+    verify: SslVerifyArg = True,
 ) -> dict[str, Any]:
     """POST ``{edge}/retrieve``; raises on non-2xx or network error."""
     root = edge_base_url.rstrip("/")
@@ -92,7 +93,7 @@ async def try_node_retrieve(
     *,
     limit: int = 20,
     filters: SearchFilters | None = None,
-    verify: bool | str = True,
+    verify: SslVerifyArg = True,
 ) -> list[SearchResultItem] | None:
     """
     Returns parsed results, or ``None`` if the request should fall back to local

@@ -61,6 +61,7 @@ class ConfigPatchRequest(BaseModel):
     edge_tls_insecure_skip_verify: bool | None = None
     edge_ingest_path_host_prefix: str | None = None
     edge_ingest_path_edge_prefix: str | None = None
+    edge_tls_spki_pins_sha256: list[str] | None = None
 
 
 MirrorId = Literal["user", "soul"]

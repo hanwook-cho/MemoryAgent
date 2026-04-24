@@ -61,6 +61,33 @@ def optional_config_string(raw: Any) -> str | None:
     return s or None
 
 
+def normalize_edge_spki_pins_sha256(raw: Any) -> list[str]:
+    """
+    Normalize ``edge_tls_spki_pins_sha256`` from JSON: list of 64-char hex strings
+    (optional ``:`` separators stripped). Invalid entries are skipped with a warning.
+    """
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        logger.warning("edge_tls_spki_pins_sha256 ignored (not a list): %r", raw)
+        return []
+    out: list[str] = []
+    for i, x in enumerate(raw):
+        if not isinstance(x, str):
+            logger.warning("edge_tls_spki_pins_sha256[%s] ignored (not a string)", i)
+            continue
+        h = x.strip().lower().replace(":", "")
+        if len(h) != 64 or any(c not in "0123456789abcdef" for c in h):
+            logger.warning(
+                "edge_tls_spki_pins_sha256[%s] ignored (expected 64 hex chars): %r",
+                i,
+                x,
+            )
+            continue
+        out.append(h)
+    return out
+
+
 @dataclass
 class AppConfig:
     host: str = "127.0.0.1"
@@ -79,6 +106,8 @@ class AppConfig:
     # When both set, host files under host_prefix map to edge paths for POST /ingest kind=file.
     edge_ingest_path_host_prefix: str | None = None
     edge_ingest_path_edge_prefix: str | None = None
+    # SPKI SHA-256 pins (hex, 64 chars each); enforced on edge HTTPS after CA validation.
+    edge_tls_spki_pins_sha256: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AppConfig:
@@ -103,6 +132,9 @@ class AppConfig:
             ),
             edge_ingest_path_edge_prefix=optional_config_string(
                 d.get("edge_ingest_path_edge_prefix")
+            ),
+            edge_tls_spki_pins_sha256=normalize_edge_spki_pins_sha256(
+                d.get("edge_tls_spki_pins_sha256")
             ),
         )
 
@@ -129,6 +161,7 @@ class AppConfig:
         d["edge_tls_insecure_skip_verify"] = self.edge_tls_insecure_skip_verify
         d["edge_ingest_path_host_prefix"] = self.edge_ingest_path_host_prefix
         d["edge_ingest_path_edge_prefix"] = self.edge_ingest_path_edge_prefix
+        d["edge_tls_spki_pins_sha256"] = list(self.edge_tls_spki_pins_sha256)
         return d
 
 
