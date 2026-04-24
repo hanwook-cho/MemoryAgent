@@ -53,6 +53,21 @@ Reusable smoke command (host must already be running):
 EDGE_BASE_URL="https://edge.example:9443" ./scripts/mp1-edge-smoke.py
 ```
 
+For local development without a real edge deployment, start the in-memory local edge in a second terminal:
+
+```bash
+# Terminal 1: host
+./scripts/run.sh
+
+# Terminal 2: local Edge Node (loopback, in-memory)
+./scripts/run-local-edge.py
+
+# Terminal 3: smoke host -> local edge
+MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL="http://127.0.0.1:9876" ./scripts/mp1-edge-smoke.py
+```
+
+`run-local-edge.py` reads the same bearer token from `.memoryagent/secrets/bearer.token` by default. Its data is in-memory and resets on restart.
+
 Useful variants:
 
 ```bash
