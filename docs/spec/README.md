@@ -24,6 +24,7 @@ This folder expands the high-level [`requirement.md`](../../requirement.md) into
 | [`mp1-pr1.md`](mp1-pr1.md) | MP1 first code PR: local backend adapters + `deployment_mode` |
 | [`mp1-pr2.md`](mp1-pr2.md) | MP1 PR-2: health `deployment` block + degraded flag for non-standalone |
 | [`mp1-verification-checklist.md`](mp1-verification-checklist.md) | Pre-implementation GO/NO-GO checklist before MP1 coding |
+| [`mp1-implementation-status.md`](mp1-implementation-status.md) | Current MP1 host-side implementation status, verification evidence, and remaining real-edge gate |
 | [`ma-dist-promotion-checklist.md`](ma-dist-promotion-checklist.md) | **GO** for **`ma-dist` → `main`** when **phases 0–8** verified (§0.1 log) per policy |
 | [`google-calendar-integration.md`](google-calendar-integration.md) | Google Calendar + local EventKit product rules and phases |
 | [`m5-packaging-decision.md`](m5-packaging-decision.md) | M5 **packaging stance**: no retail bundle yet; signed `.app` deferred until post–core-dev |
