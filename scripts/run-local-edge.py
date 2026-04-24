@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a local in-memory Edge Node for MP1 development and smoke tests."""
+"""Run a local persistent Edge Node for MP1 development and smoke tests."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import os
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ def _repo_root() -> Path:
 
 
 def _reexec_with_core_venv() -> None:
-    """Use the core venv so script deps (`fastapi`, `uvicorn`) are available."""
+    """Use the core venv so script deps (`fastapi`, `uvicorn`, `chromadb`) are available."""
     if os.environ.get("MEMORYAGENT_SKIP_VENV_REEXEC") == "1":
         return
     venv_py = _repo_root() / "services" / "core" / ".venv" / "bin" / "python"
@@ -26,10 +27,16 @@ def _reexec_with_core_venv() -> None:
         os.environ["MEMORYAGENT_SKIP_VENV_REEXEC"] = "1"
         os.execv(str(venv_py), [str(venv_py), *sys.argv])
 
+
 _reexec_with_core_venv()
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+
+from memoryagent.embeddings import DeterministicEmbedder, OllamaEmbedder
+from memoryagent.llm_client import FakeLlm
+from memoryagent.rag_service import RagService, SearchFilters
+from memoryagent.vector_store import VectorStore
 
 
 def _bearer_token_path(data_dir: Path) -> Path:
@@ -50,57 +57,51 @@ def _require_bearer(request: Request, token: str | None) -> None:
     if not auth or not auth.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
-            detail={
-                "error": {
-                    "code": "UNAUTHORIZED",
-                    "message": "Missing Authorization: Bearer <token>.",
-                    "retryable": False,
-                    "details": {},
-                }
-            },
+            detail=_error("UNAUTHORIZED", "Missing Authorization: Bearer <token>."),
         )
     if auth[7:].strip() != token:
         raise HTTPException(
             status_code=401,
-            detail={
-                "error": {
-                    "code": "UNAUTHORIZED",
-                    "message": "Bearer token does not match local edge token.",
-                    "retryable": False,
-                    "details": {},
-                }
-            },
+            detail=_error("UNAUTHORIZED", "Bearer token does not match local edge token."),
         )
 
 
-def _tokens(text: str) -> set[str]:
-    return {t.lower() for t in text.replace("-", " ").replace("_", " ").split() if t}
+def _parse_datetime(raw: Any) -> datetime | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=_error("VALIDATION", f"invalid ISO datetime: {s}"),
+        ) from None
 
 
-def _score(query: str, text: str) -> float:
-    q = _tokens(query)
-    if not q:
-        return 0.0
-    t = _tokens(text)
-    overlap = len(q & t) / max(1, len(q))
-    if query.lower() in text.lower():
-        overlap += 0.5
-    return min(1.0, overlap)
+def _filters_from_node_payload(body: dict[str, Any]) -> SearchFilters:
+    raw = body.get("filters")
+    filters = raw if isinstance(raw, dict) else {}
+    return SearchFilters(
+        source_kind=str(filters["source_kind"]) if filters.get("source_kind") else None,
+        path_prefix=str(filters["path_prefix"]) if filters.get("path_prefix") else None,
+        indexed_after=_parse_datetime(filters.get("indexed_after")),
+        indexed_before=_parse_datetime(filters.get("indexed_before")),
+    )
 
 
-def _snippet(text: str, query: str, limit: int = 500) -> str:
-    low = text.lower()
-    q = query.lower().strip()
-    if q and q in low:
-        start = max(0, low.index(q) - 80)
-    else:
-        start = 0
-    return text[start : start + limit]
+@dataclass(slots=True)
+class EdgeState:
+    data_dir: Path
+    store: VectorStore
+    rag: RagService
+    last_error: str | None = None
 
 
-def create_app(*, token: str | None, node_id: str) -> FastAPI:
+def create_app(*, token: str | None, node_id: str, state: EdgeState) -> FastAPI:
     app = FastAPI(title="MemoryAgent Local Edge Node", version="0.1-dev")
-    docs: list[dict[str, Any]] = []
 
     @app.get("/health")
     async def health(request: Request) -> dict[str, Any]:
@@ -119,13 +120,14 @@ def create_app(*, token: str | None, node_id: str) -> FastAPI:
     @app.get("/index/status")
     async def index_status(request: Request) -> dict[str, Any]:
         _require_bearer(request, token)
+        stats = state.rag.index_stats()
         return {
             "queue_depth": 0,
             "active_jobs": 0,
-            "last_indexed_at": docs[-1]["indexed_at"] if docs else None,
-            "last_error": None,
-            "documents": len({d["document_id"] for d in docs}),
-            "chunks": len(docs),
+            "last_indexed_at": None,
+            "last_error": state.last_error,
+            "documents": stats["documents"],
+            "chunks": stats["chunks"],
         }
 
     @app.post("/ingest")
@@ -135,48 +137,33 @@ def create_app(*, token: str | None, node_id: str) -> FastAPI:
         if not isinstance(body, dict):
             raise HTTPException(status_code=400, detail=_error("VALIDATION", "body must be an object"))
         kind = str(body.get("kind") or "").strip()
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        if kind == "memory":
-            text = str(body.get("text") or "").strip()
-            if not text:
-                raise HTTPException(status_code=400, detail=_error("VALIDATION", "text is required"))
-            doc_id = str(uuid.uuid4())
-            docs.append(
-                {
-                    "document_id": doc_id,
-                    "chunk_id": f"{doc_id}:0",
-                    "text": text,
-                    "source": str(body.get("source") or "edge_memory"),
-                    "source_kind": "memory",
-                    "tags": list(body.get("tags") or []),
-                    "indexed_at": now,
-                }
-            )
-            return {"status": "accepted", "job_id": doc_id}
-        if kind == "file":
-            raw_path = str(body.get("path") or "").strip()
-            if not raw_path:
-                raise HTTPException(status_code=400, detail=_error("VALIDATION", "path is required"))
-            p = Path(raw_path).expanduser()
-            if not p.is_file():
-                raise HTTPException(status_code=400, detail=_error("VALIDATION", f"file not found: {raw_path}"))
-            try:
-                text = p.read_text(encoding="utf-8", errors="replace")
-            except OSError as e:
-                raise HTTPException(status_code=500, detail=_error("INTERNAL", str(e))) from e
-            doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, p.resolve().as_uri()))
-            docs.append(
-                {
-                    "document_id": doc_id,
-                    "chunk_id": f"{doc_id}:0",
-                    "text": text,
-                    "source": str(p.resolve()),
-                    "source_kind": "file",
-                    "tags": [],
-                    "indexed_at": now,
-                }
-            )
-            return {"status": "accepted", "job_id": doc_id}
+        try:
+            if kind == "memory":
+                text = str(body.get("text") or "").strip()
+                if not text:
+                    raise HTTPException(status_code=400, detail=_error("VALIDATION", "text is required"))
+                tags = body.get("tags")
+                tag_list = [str(x) for x in tags] if isinstance(tags, list) else []
+                source = str(body.get("source") or "edge_memory")
+                doc_id, job_id = await state.rag.ingest_memory(
+                    text,
+                    tags=tag_list,
+                    source=source,
+                )
+                state.last_error = None
+                return {"status": "accepted", "job_id": job_id, "document_id": doc_id}
+            if kind == "file":
+                raw_path = str(body.get("path") or "").strip()
+                if not raw_path:
+                    raise HTTPException(status_code=400, detail=_error("VALIDATION", "path is required"))
+                doc_id = await state.rag.ingest_file_path(Path(raw_path))
+                state.last_error = None
+                return {"status": "accepted", "job_id": doc_id, "document_id": doc_id}
+        except HTTPException:
+            raise
+        except Exception as e:
+            state.last_error = str(e)
+            raise HTTPException(status_code=500, detail=_error("INTERNAL", str(e))) from e
         raise HTTPException(status_code=400, detail=_error("VALIDATION", "kind must be file or memory"))
 
     @app.post("/retrieve")
@@ -189,50 +176,44 @@ def create_app(*, token: str | None, node_id: str) -> FastAPI:
         query = str(body.get("query") or "").strip()
         if not query:
             raise HTTPException(status_code=400, detail=_error("VALIDATION", "query is required"))
-        limit = int(body.get("limit") or 8)
-        filters = body.get("filters") if isinstance(body.get("filters"), dict) else {}
-        source_kind = filters.get("source_kind")
-        path_prefix = filters.get("path_prefix")
-
-        ranked: list[tuple[float, dict[str, Any]]] = []
-        for d in docs:
-            if source_kind and d["source_kind"] != source_kind:
-                continue
-            if path_prefix and not str(d["source"]).startswith(str(path_prefix)):
-                continue
-            s = _score(query, d["text"])
-            if s <= 0:
-                continue
-            ranked.append((s, d))
-        ranked.sort(key=lambda x: x[0], reverse=True)
+        try:
+            limit = max(1, int(body.get("limit") or 8))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail=_error("VALIDATION", "limit must be an integer")) from None
+        hits = await state.rag.search(
+            query,
+            limit=limit,
+            filters=_filters_from_node_payload(body),
+        )
         rows = [
             {
-                "chunk_id": d["chunk_id"],
-                "document_id": d["document_id"],
-                "snippet": _snippet(d["text"], query),
-                "score": round(score, 4),
-                "source": d["source"],
-                "source_kind": d["source_kind"],
-                "indexed_at": d["indexed_at"],
+                "chunk_id": h.chunk_id,
+                "document_id": h.document_id,
+                "snippet": h.snippet,
+                "score": h.score,
+                "source": "local_dev_edge",
+                "source_kind": "memory",
+                "indexed_at": datetime.now().astimezone().isoformat(),
                 "backend_id": "local_dev_edge",
             }
-            for score, d in ranked[: max(1, limit)]
+            for h in hits
         ]
         return {
             "results": rows,
             "meta": {
                 "query_ms": int((time.perf_counter() - started) * 1000),
                 "backend_id": "local_dev_edge",
-                "total_candidates": len(ranked),
+                "total_candidates": len(rows),
             },
         }
 
     @app.post("/control/reindex")
     async def reindex(request: Request) -> dict[str, Any]:
         _require_bearer(request, token)
-        # This dev edge is in-memory and synchronous; clearing is the least surprising reset.
-        docs.clear()
-        return {"status": "accepted", "job_id": str(uuid.uuid4())}
+        state.rag.reset_search_index()
+        state.last_error = None
+        job_id = str(uuid.uuid4())
+        return {"status": "accepted", "job_id": job_id}
 
     return app
 
@@ -255,12 +236,17 @@ def main() -> int:
     ap.add_argument(
         "--data-dir",
         default=str(_repo_root() / ".memoryagent"),
-        help="Data dir to read secrets/bearer.token from.",
+        help="Host data dir to read secrets/bearer.token from.",
+    )
+    ap.add_argument(
+        "--edge-data-dir",
+        default=str(_repo_root() / ".memoryagent-edge"),
+        help="Persistent local edge data dir (default: repo .memoryagent-edge).",
     )
     ap.add_argument(
         "--token",
         default=None,
-        help="Bearer token override. Defaults to data dir token.",
+        help="Bearer token override. Defaults to host data dir token.",
     )
     ap.add_argument(
         "--no-auth",
@@ -268,6 +254,19 @@ def main() -> int:
         help="Disable bearer checking for local experiments.",
     )
     ap.add_argument("--node-id", default="local-dev-edge")
+    ap.add_argument(
+        "--ollama-base-url",
+        default=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+    )
+    ap.add_argument(
+        "--embed-model",
+        default=os.environ.get("EMBED_MODEL", "nomic-embed-text"),
+    )
+    ap.add_argument(
+        "--deterministic-embedder",
+        action="store_true",
+        help="Use deterministic local embeddings instead of Ollama (dev/tests only).",
+    )
     args = ap.parse_args()
 
     token = None if args.no_auth else (args.token or _load_bearer_token(Path(args.data_dir)))
@@ -277,13 +276,36 @@ def main() -> int:
             f"Bearer token not found at {p}. Start the host once or pass --token/--no-auth."
         )
 
+    edge_data_dir = Path(args.edge_data_dir).expanduser().resolve()
+    store = VectorStore(edge_data_dir / "store" / "vector" / "chroma")
+    embedder = (
+        DeterministicEmbedder()
+        if args.deterministic_embedder
+        else OllamaEmbedder(args.ollama_base_url, args.embed_model)
+    )
+    rag = RagService(
+        data_dir=edge_data_dir,
+        store=store,
+        embedder=embedder,
+        llm=FakeLlm(reply="local edge"),
+    )
+    state = EdgeState(data_dir=edge_data_dir, store=store, rag=rag)
+
     print(f"==> Starting local Edge Node at http://{args.host}:{args.port}")
     if token:
         print("    Auth: bearer token loaded (same token host sends to Edge Node)")
     else:
         print("    Auth: disabled (--no-auth)")
-    print("    Data: in-memory only; restart clears ingested edge docs")
-    uvicorn.run(create_app(token=token, node_id=args.node_id), host=args.host, port=args.port)
+    print(f"    Data: persistent Chroma edge index at {edge_data_dir}")
+    if args.deterministic_embedder:
+        print("    Embeddings: deterministic local stub")
+    else:
+        print(f"    Embeddings: Ollama {args.embed_model} at {args.ollama_base_url}")
+    uvicorn.run(
+        create_app(token=token, node_id=args.node_id, state=state),
+        host=args.host,
+        port=args.port,
+    )
     return 0
 
 

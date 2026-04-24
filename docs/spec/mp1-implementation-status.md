@@ -69,20 +69,20 @@ Reusable smoke command (host must already be running):
 EDGE_BASE_URL="https://edge.example:9443" ./scripts/mp1-edge-smoke.py
 ```
 
-For local development without a real edge deployment, start the in-memory local edge in a second terminal:
+For local development without a real edge deployment, start the persistent local edge in a second terminal:
 
 ```bash
 # Terminal 1: host
 ./scripts/run.sh
 
-# Terminal 2: local Edge Node (loopback, in-memory)
+# Terminal 2: local Edge Node (loopback, Chroma-backed, persistent)
 ./scripts/run-local-edge.py
 
 # Terminal 3: smoke host -> local edge
 MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL="http://127.0.0.1:9876" ./scripts/mp1-edge-smoke.py
 ```
 
-`run-local-edge.py` reads the same bearer token from `.memoryagent/secrets/bearer.token` by default. Its data is in-memory and resets on restart.
+`run-local-edge.py` reads the same bearer token from `.memoryagent/secrets/bearer.token` by default. Its edge index is Chroma-backed and persists under `.memoryagent-edge/` unless `--edge-data-dir` points elsewhere. It uses Ollama embeddings by default (`OLLAMA_BASE_URL`, `EMBED_MODEL`) and supports `--deterministic-embedder` for isolated dev/test runs.
 
 Useful variants:
 

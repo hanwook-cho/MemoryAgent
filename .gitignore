@@ -1,5 +1,6 @@
 # Local data (config, secrets, vector store)
 .memoryagent/
+.memoryagent-edge/
 
 # Python
 .venv/
