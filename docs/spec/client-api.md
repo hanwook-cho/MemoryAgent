@@ -133,6 +133,8 @@ Optional filters:
 
 `PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`, `deployment_mode`, `edge_base_url` (empty string clears `edge_base_url`), the edge TLS and `edge_ingest_path_*` fields above (including `edge_tls_spki_pins_sha256` as a JSON array; use `[]` to clear pins). Changing any of those edge-related keys rebinds retrieval/ingest clients in-process.
 
+**SPKI pins (how to compute, when to rotate):** see [`node-api.md`](node-api.md) §2.1.
+
 ### 3.9 Markdown mirror
 
 `GET /mirror`, `GET /mirror/{id}`, `PUT /mirror/{id}`.

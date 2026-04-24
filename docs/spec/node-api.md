@@ -24,6 +24,42 @@ It is not intended for direct end-user clients.
 - mTLS: optional future hardening, not required in v1
 - **Host backend TLS to Node:** the Python host may set a custom CA bundle (`edge_tls_ca_bundle`), `edge_tls_spki_pins_sha256` (list of 64-hex-character **SPKI** SHA-256 digests), or `edge_tls_insecure_skip_verify` for lab only; see `GET/PATCH /config` in [`client-api.md`](client-api.md). SPKI pins are enforced on the leaf certificate public key after standard chain + hostname verification (see [`edge_http.py`](../../services/core/memoryagent/edge_http.py) `PinningSSLContext`).
 
+### 2.1 SPKI pinning — guidelines (when and how)
+
+**What the pin is:** each entry in `edge_tls_spki_pins_sha256` is the **SHA-256** digest of the **leaf** certificate’s **SubjectPublicKeyInfo** (SPKI) DER, expressed as **64 lowercase hex characters** (optional `:` between byte pairs is stripped on load). This matches common tooling:
+
+```bash
+# From the operator-held leaf PEM (same cert the edge uses for HTTPS):
+openssl x509 -in edge-leaf.pem -noout -pubkey \
+  | openssl pkey -pubin -outform DER \
+  | openssl dgst -sha256 -hex
+```
+
+The line after `SHA256(stdin)=` is the value to store (hex only, no `0x`).
+
+**From a live server** (use the hostname/port you put in `edge_base_url`; adjust SNI if needed):
+
+```bash
+echo | openssl s_client -connect EDGE_HOST:443 -servername EDGE_HOST 2>/dev/null \
+  | openssl x509 -noout -pubkey \
+  | openssl pkey -pubin -outform DER \
+  | openssl dgst -sha256 -hex
+```
+
+**When to compute it**
+
+- **Before enabling pins in production:** after the edge (or TLS terminator in front of it) is serving the intended **leaf** cert/key, compute the pin from that material and set `edge_tls_spki_pins_sha256` via `PATCH /config`, then confirm `GET /health` and a sample retrieve/ingest succeed.
+- **Before a private-key rotation:** compute the pin for the **new** key, `PATCH` an array that includes **both** old and new pins, roll the server, then `PATCH` again to drop the old pin once stable.
+- **When debugging `certificate pinning failed`:** re-run the commands against the cert the host **actually** sees (correct hostname, same path as production); compare to config (typos, wrong env, load balancer presenting a different cert).
+
+**Operational rules**
+
+- Pins are **not** checked when `edge_tls_insecure_skip_verify` is `true` (lab only); the host logs a warning if pins are set but skipped.
+- Prefer **at least two pins** in the array during rotation windows so you do not brick clients mid-cutover.
+- Re-issuing a **new leaf certificate with the same private key** usually keeps the **same** SPKI pin; changing the key changes the pin.
+
+For field names and JSON shape on the HTTP API, see [`client-api.md`](client-api.md) §3.7–3.8.
+
 ## 3. Base URL and versioning
 
 - Base URL: `https://<edge-node>/`
