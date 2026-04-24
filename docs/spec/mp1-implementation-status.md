@@ -94,6 +94,14 @@ MP1_REQUIRE_RETRIEVE_HITS=1 \
 
 `run-local-edge.py` reads the same bearer token from `.memoryagent/secrets/bearer.token` by default. Its edge index is Chroma-backed and persists under `.memoryagent-edge/` unless `--edge-data-dir` points elsewhere. It uses Ollama embeddings by default (`OLLAMA_BASE_URL`, `EMBED_MODEL`) and supports `--deterministic-embedder` for isolated dev/test runs.
 
+Local edge admin helpers:
+
+```bash
+./scripts/local-edge-admin.py health
+./scripts/local-edge-admin.py status
+./scripts/local-edge-admin.py reset
+```
+
 Useful variants:
 
 ```bash
