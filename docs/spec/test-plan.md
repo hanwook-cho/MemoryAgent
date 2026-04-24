@@ -137,6 +137,10 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 
 **Exit:** [`tests/test_mp1_remote_retrieve.py`](../../services/core/tests/test_mp1_remote_retrieve.py), [`tests/test_mp1_mock_edge_smoke.py`](../../services/core/tests/test_mp1_mock_edge_smoke.py), and [`tests/test_edge_http.py`](../../services/core/tests/test_edge_http.py) green.
 
+**Local distributed smoke evidence:** persistent Chroma-backed local Edge Node (`scripts/run-local-edge.py`) + `scripts/mp1-edge-smoke.py` passed with `MP1_REQUIRE_RETRIEVE_HITS=1` and `MP1_FILE_SMOKE_ROOT=...`; see [`mp1-implementation-status.md`](mp1-implementation-status.md).
+
+**Remaining external gate:** repeat or waive the same smoke against a non-local HTTPS Edge Node, including `edge_tls_ca_bundle` / `edge_tls_spki_pins_sha256` when configured.
+
 ## 8. Optional — Native shell
 
 | Goal | Automated | Manual |
