@@ -82,6 +82,8 @@ This document maps **each milestone** in [`milestones.md`](milestones.md) to **w
 
 **Exit:** Benchmark doc checked in; CI fails if regression beyond agreed threshold (optional gate).
 
+**Current evidence (2026-04-25):** [`docs/benchmarks/m5-2026-04-25.md`](../benchmarks/m5-2026-04-25.md) refreshes the NFR baseline. `./scripts/setup-dev.sh` exits 0 on the reference Mac and confirms the default `llama3.2` and `nomic-embed-text` Ollama models are present. The running core service returns `200` from `/api/v1/health` with `deployment.degraded=false`.
+
 ### 7.1 MP1 — PR-1 (backend scaffolding; default `standalone` unchanged)
 
 **Relationship to [`mp1-verification-checklist.md`](mp1-verification-checklist.md):** that checklist is the **pre-implementation** design gate (**GO** / **NO-GO**). This subsection is the **test plan for the first code PR** after GO.
@@ -140,6 +142,21 @@ Scope: [`mp1-pr2.md`](mp1-pr2.md).
 **Local distributed smoke evidence:** persistent Chroma-backed local Edge Node (`scripts/run-local-edge.py`) + `scripts/mp1-edge-smoke.py` passed with `MP1_REQUIRE_RETRIEVE_HITS=1` and `MP1_FILE_SMOKE_ROOT=...`; see [`mp1-implementation-status.md`](mp1-implementation-status.md).
 
 **Remaining external gate:** repeat or waive the same smoke against a non-local HTTPS Edge Node, including `edge_tls_ca_bundle` / `edge_tls_spki_pins_sha256` when configured.
+
+### 7.5 Phase 2 — Google Calendar OAuth + read path
+
+| Goal | Automated | Manual / smoke |
+| :--- | :--- | :--- |
+| Include off means no Google calls | **Integration:** default config has `google_calendar_include: false`; `PATCH /config` rejects `true` until OAuth token storage exists; status reports `off` (`tests/test_mp1_pr1.py`, `tests/test_m4_calendar.py`) | Confirm UI toggle remains off before consent |
+| OAuth connection state | **Integration:** `POST /calendar/google/connect` requires client ID and returns authorization URL; callback enables Include; callback is public but state-protected; disconnect best-effort revokes the Google token, deletes token storage, and turns Include off (`tests/test_m4_calendar.py`) | Real browser OAuth + optional disconnect smoke using [`google-calendar-setup.md`](google-calendar-setup.md) |
+| Local + Google list merge | **Integration:** mocked EventKit + mocked Google list return sorted, labeled rows; Google failure soft-degrades with local rows (`tests/test_m4_calendar.py`) | `scripts/google-calendar-smoke.py` verifies non-degraded Google `calendar.list_events` |
+| Local + Google past search | **Integration:** mocked EventKit + mocked Google search return sorted, labeled rows; Google failure soft-degrades with local rows (`tests/test_m4_calendar.py`) | `scripts/google-calendar-smoke.py` verifies non-degraded Google `calendar.search_past_events` |
+| Explicit write target | **Integration:** `calendar.create_event` and `POST /calendar/events` require `calendar_target` when Include is on; local target routes to EventKit; Google target routes to mocked Google create (`tests/test_m4_calendar.py`) | Web UI create form requires Local vs Google choice when Include is on; live write smoke creates Google event |
+| Secret handling | **Unit/integration-adjacent:** API never exposes client secret; smoke copies env secret to `.memoryagent/secrets/google_calendar_client_secret.txt` for backend callback use | Rotate any exposed OAuth secret in Google Cloud; verify secret file is not committed |
+
+**Live Google Calendar smoke evidence:** full cleanup-enabled `scripts/google-calendar-smoke.py` passed after Google Calendar API enablement and reconnect with `calendar.events`: OAuth status `on`; `calendar.list_events` Google source checked (`count=14`); `calendar.search_past_events` Google source checked (`count=20`); `calendar.create_event` created Google event `7428q31oduk8koi5jp73tf2bv0`; smoke cleanup deleted the event; `POST /calendar/google/disconnect` completed and left Google Include off. Manual web UI smoke passed: browser form showed Local vs Google target choice and successfully created a Google Calendar event. External revocation smoke passed: Google revocation outside MemoryAgent caused safe Google degradation while local EventKit results remained available; reconnect recovered list/search/write.
+
+**Remaining Google Calendar gates:** broader write-scope compliance/release review before treating Google writes as production-ready.
 
 ## 8. Optional — Native shell
 

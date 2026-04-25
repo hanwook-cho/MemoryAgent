@@ -16,7 +16,7 @@ Planned **distributed / MP1** work (multi-host, optional edge node, Client vs No
 ## Status snapshot
 
 - M0-M3 complete (core API, RAG loop, watcher, mirror/audit UI).
-- M4 complete for tools + calendar EventKit path: `calendar.list_events`, `calendar.search_past_events`, `calendar.create_event`.
+- M4 complete for tools + calendar EventKit path: `calendar.list_events`, `calendar.search_past_events`, `calendar.create_event`. Google Calendar list/search/create support is now behind the explicit `google_calendar_include` setting and OAuth connect flow, with Local vs Google target choice for event creation.
 - REST wrapper for calendar create is live: `POST /api/v1/calendar/events`.
 - Optional M4 remainder: Reminders read integration.
 - Document format expansion plan (index DB + PDF/DOCX): `docs/spec/pdf-docx-index-plan.md` (index DB + PDF + DOCX + metadata-aware retrieval now implemented).
@@ -71,6 +71,8 @@ Open **http://127.0.0.1:8765/** — static UI loads from `web/dist`. The first l
 **MP1 real Edge Node smoke:** with the core running, set `EDGE_BASE_URL` and run `./scripts/mp1-edge-smoke.py` to validate host↔edge `GET /health`, `POST /retrieve`, and `POST /ingest` paths (see [`docs/spec/mp1-implementation-status.md`](docs/spec/mp1-implementation-status.md)).
 
 **MP1 local Edge Node (dev only):** start the host once so `.memoryagent/secrets/bearer.token` exists, then in a second terminal run `./scripts/run-local-edge.py` (default `http://127.0.0.1:9876`, persistent edge data in `.memoryagent-edge/`, Ollama embeddings by default). In a third terminal: `MP1_REQUIRE_RETRIEVE_HITS=1 EDGE_BASE_URL=http://127.0.0.1:9876 ./scripts/mp1-edge-smoke.py`. Add `MP1_FILE_SMOKE_ROOT="$PWD/.memoryagent-edge-smoke"` to also verify host watcher → edge `kind=file` path mapping. Inspect/reset the local edge with `./scripts/local-edge-admin.py status` and `./scripts/local-edge-admin.py reset`.
+
+**Google Calendar OAuth smoke:** create a Google Cloud OAuth client whose redirect URI is `http://127.0.0.1:8765/api/v1/calendar/google/callback` (full setup guide: [`docs/spec/google-calendar-setup.md`](docs/spec/google-calendar-setup.md)). With the host running, set `GOOGLE_CALENDAR_CLIENT_ID` and either `GOOGLE_CALENDAR_CLIENT_SECRET` or `.memoryagent/secrets/google_calendar_client_secret.txt`, then run `services/core/.venv/bin/python scripts/google-calendar-smoke.py`. The script copies an env-provided secret into `.memoryagent/secrets/google_calendar_client_secret.txt` so the backend callback can read it, prints the consent URL, waits for the browser callback to complete, and verifies Google-backed `calendar.list_events` and `calendar.search_past_events` are not degraded.
 
 ## Validated calendar commands
 

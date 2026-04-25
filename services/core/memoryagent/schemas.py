@@ -62,6 +62,9 @@ class ConfigPatchRequest(BaseModel):
     edge_ingest_path_host_prefix: str | None = None
     edge_ingest_path_edge_prefix: str | None = None
     edge_tls_spki_pins_sha256: list[str] | None = None
+    google_calendar_include: bool | None = None
+    google_calendar_oauth_client_id: str | None = None
+    google_calendar_oauth_redirect_uri: str | None = None
 
 
 MirrorId = Literal["user", "soul"]
@@ -120,6 +123,8 @@ class CalendarEventCreateRequest(BaseModel):
     location: str | None = None
     notes: str | None = None
     calendar_id: str | None = None
+    calendar_target: str | None = None
+    google_calendar_id: str | None = None
 
 
 class CalendarEventCreateResponse(BaseModel):
@@ -127,3 +132,20 @@ class CalendarEventCreateResponse(BaseModel):
     title: str
     starts_at: str
     ends_at: str
+    calendar_target: str | None = None
+    calendar_id: str | None = None
+    html_link: str | None = None
+
+
+class GoogleCalendarStatusResponse(BaseModel):
+    include: bool
+    connected: bool
+    status: str
+    account_hint: str | None = None
+    message: str | None = None
+
+
+class GoogleCalendarConnectResponse(BaseModel):
+    authorization_url: str
+    state: str
+    expires_in_seconds: int

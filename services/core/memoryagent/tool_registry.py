@@ -14,6 +14,12 @@ from memoryagent.calendar_bridge import (
 )
 from memoryagent.config_store import load_config
 from memoryagent.file_access import path_is_allowlisted_for_read
+from memoryagent.google_calendar import (
+    GoogleCalendarApiError,
+    create_google_calendar_event,
+    list_google_calendar_events,
+    search_google_calendar_past_events,
+)
 from memoryagent.rag_service import RagService
 
 ToolHandler = Callable[[RagService, dict[str, Any]], Awaitable[dict[str, Any]]]
@@ -131,22 +137,155 @@ def _make_file_read_handler(data_dir: Path) -> ToolHandler:
     return _file_read
 
 
-async def _calendar_list_events(rag: RagService, args: dict[str, Any]) -> dict[str, Any]:
-    """List Calendar events in [start, end) via EventKit (macOS native helper)."""
-    _ = rag
-    return await run_list_events(args)
+def _calendar_sort_key(event: dict[str, Any]) -> str:
+    value = event.get("starts_at")
+    return value if isinstance(value, str) else ""
 
 
-async def _calendar_search_past_events(rag: RagService, args: dict[str, Any]) -> dict[str, Any]:
-    """Search past events for location/title reuse (agent-actions.md §3.4)."""
-    _ = rag
-    return await run_search_past_events(args)
+def _label_calendar_events(
+    events: list[Any],
+    *,
+    source: str,
+    source_label: str,
+) -> list[dict[str, Any]]:
+    labeled: list[dict[str, Any]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        item = dict(event)
+        item.setdefault("source", source)
+        item.setdefault("source_label", source_label)
+        labeled.append(item)
+    return labeled
 
 
-async def _calendar_create_event(rag: RagService, args: dict[str, Any]) -> dict[str, Any]:
-    """Create a Calendar event via EventKit."""
-    _ = rag
-    return await run_create_event(args)
+def _make_calendar_list_events_handler(data_dir: Path) -> ToolHandler:
+    async def _calendar_list_events(rag: RagService, args: dict[str, Any]) -> dict[str, Any]:
+        """List local events, plus Google Calendar when Include is on."""
+        _ = rag
+        local = await run_list_events(args)
+        local_events = _label_calendar_events(
+            local.get("events") if isinstance(local, dict) else [],
+            source="local",
+            source_label="Local Calendar",
+        )
+        cfg = load_config(data_dir)
+        if not cfg.google_calendar_include:
+            return {"events": local_events, "count": len(local_events)}
+
+        google_degraded = False
+        google_degraded_reason = None
+        google_events: list[dict[str, Any]] = []
+        try:
+            google = await list_google_calendar_events(data_dir, cfg, args)
+            google_events = _label_calendar_events(
+                google.get("events") if isinstance(google, dict) else [],
+                source="google",
+                source_label="Google Calendar",
+            )
+        except GoogleCalendarApiError as e:
+            google_degraded = True
+            google_degraded_reason = str(e)
+
+        events = sorted([*local_events, *google_events], key=_calendar_sort_key)
+        return {
+            "events": events,
+            "count": len(events),
+            "sources": {
+                "local": {"count": len(local_events), "degraded": False},
+                "google": {
+                    "count": len(google_events),
+                    "degraded": google_degraded,
+                    "degraded_reason": google_degraded_reason,
+                },
+            },
+        }
+
+    return _calendar_list_events
+
+
+def _make_calendar_search_past_events_handler(data_dir: Path) -> ToolHandler:
+    async def _calendar_search_past_events(
+        rag: RagService, args: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Search local past events, plus Google Calendar when Include is on."""
+        _ = rag
+        local = await run_search_past_events(args)
+        local_events = _label_calendar_events(
+            local.get("events") if isinstance(local, dict) else [],
+            source="local",
+            source_label="Local Calendar",
+        )
+        cfg = load_config(data_dir)
+        if not cfg.google_calendar_include:
+            return {"events": local_events, "count": len(local_events)}
+
+        google_degraded = False
+        google_degraded_reason = None
+        google_events: list[dict[str, Any]] = []
+        try:
+            google = await search_google_calendar_past_events(data_dir, cfg, args)
+            google_events = _label_calendar_events(
+                google.get("events") if isinstance(google, dict) else [],
+                source="google",
+                source_label="Google Calendar",
+            )
+        except GoogleCalendarApiError as e:
+            google_degraded = True
+            google_degraded_reason = str(e)
+
+        events = sorted([*local_events, *google_events], key=_calendar_sort_key, reverse=True)
+        return {
+            "events": events,
+            "count": len(events),
+            "sources": {
+                "local": {"count": len(local_events), "degraded": False},
+                "google": {
+                    "count": len(google_events),
+                    "degraded": google_degraded,
+                    "degraded_reason": google_degraded_reason,
+                },
+            },
+        }
+
+    return _calendar_search_past_events
+
+
+def _calendar_target(args: dict[str, Any]) -> str | None:
+    raw = args.get("calendar_target") or args.get("target_calendar") or args.get("provider")
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise ValueError("calendar_target must be 'local' or 'google'")
+    target = raw.strip().lower()
+    if target not in {"local", "google"}:
+        raise ValueError("calendar_target must be 'local' or 'google'")
+    return target
+
+
+def _make_calendar_create_event_handler(data_dir: Path) -> ToolHandler:
+    async def _calendar_create_event(rag: RagService, args: dict[str, Any]) -> dict[str, Any]:
+        """Create a Calendar event via local EventKit or Google Calendar."""
+        _ = rag
+        cfg = load_config(data_dir)
+        target = _calendar_target(args)
+        if cfg.google_calendar_include and target is None:
+            raise ValueError(
+                "calendar_target is required when Google Calendar is included; "
+                "use 'local' or 'google'"
+            )
+        if target == "google":
+            if not cfg.google_calendar_include:
+                raise ValueError("Google Calendar is not included; choose local or connect Google")
+            try:
+                return await create_google_calendar_event(data_dir, cfg, args)
+            except GoogleCalendarApiError as e:
+                raise ValueError(str(e)) from e
+        out = await run_create_event(args)
+        out["calendar_target"] = "local"
+        return out
+
+    return _calendar_create_event
 
 
 async def _memory_save(rag: RagService, args: dict[str, Any]) -> dict[str, Any]:
@@ -195,7 +334,7 @@ def build_default_registry(data_dir: Path) -> ToolRegistry:
             ),
             required_capability=None,
         ),
-        _calendar_list_events,
+        _make_calendar_list_events_handler(data_dir),
     )
     reg.register(
         ToolDefinition(
@@ -207,7 +346,7 @@ def build_default_registry(data_dir: Path) -> ToolRegistry:
             ),
             required_capability=None,
         ),
-        _calendar_search_past_events,
+        _make_calendar_search_past_events_handler(data_dir),
     )
     reg.register(
         ToolDefinition(
@@ -218,6 +357,6 @@ def build_default_registry(data_dir: Path) -> ToolRegistry:
             ),
             required_capability=None,
         ),
-        _calendar_create_event,
+        _make_calendar_create_event_handler(data_dir),
     )
     return reg

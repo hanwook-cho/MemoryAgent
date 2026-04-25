@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +32,18 @@ from memoryagent.edge_http import edge_httpx_verify
 from memoryagent.deployment_runtime import chat_meta_block, health_deployment_block
 from memoryagent.embeddings import DeterministicEmbedder, Embedder, OllamaEmbedder
 from memoryagent.folder_picker import pick_folder_macos
+from memoryagent.google_calendar import (
+    GOOGLE_CALENDAR_OAUTH_STATE_TTL_SECONDS,
+    GoogleCalendarApiError,
+    GoogleCalendarOAuthError,
+    build_google_calendar_authorization_url,
+    create_google_calendar_event,
+    delete_google_calendar_tokens,
+    exchange_google_calendar_authorization_code,
+    google_calendar_account_hint,
+    google_calendar_connected,
+    revoke_google_calendar_tokens,
+)
 from memoryagent.llm_client import FakeLlm, LlmClient, OllamaLlm
 from memoryagent.logging_setup import configure_logging
 from memoryagent.mirror import MIRROR_FILES, ensure_mirror_file, validate_mirror_content
@@ -46,6 +58,8 @@ from memoryagent.schemas import (
     CalendarEventCreateResponse,
     ChatRequest,
     ConfigPatchRequest,
+    GoogleCalendarConnectResponse,
+    GoogleCalendarStatusResponse,
     MemoryEntryRequest,
     MemoryEntryResponse,
     MirrorDocumentResponse,
@@ -187,6 +201,7 @@ def create_app(
         }
 
     checker = BearerChecker(bearer_token)
+    public_router = APIRouter(prefix=API_PREFIX)
     router = APIRouter(prefix=API_PREFIX, dependencies=[Depends(checker)])
 
     @router.get("/config")
@@ -208,6 +223,9 @@ def create_app(
             "edge_ingest_path_host_prefix": c.edge_ingest_path_host_prefix,
             "edge_ingest_path_edge_prefix": c.edge_ingest_path_edge_prefix,
             "edge_tls_spki_pins_sha256": list(c.edge_tls_spki_pins_sha256),
+            "google_calendar_include": c.google_calendar_include,
+            "google_calendar_oauth_client_id": c.google_calendar_oauth_client_id,
+            "google_calendar_oauth_redirect_uri": c.google_calendar_oauth_redirect_uri,
             "ui": {
                 "chat_welcome_dismissed": False,
                 "chat_welcome_version": "3",
@@ -269,6 +287,30 @@ def create_app(
         if "edge_tls_spki_pins_sha256" in fs:
             c.edge_tls_spki_pins_sha256 = normalize_edge_spki_pins_sha256(
                 body.edge_tls_spki_pins_sha256
+            )
+        if "google_calendar_include" in fs:
+            requested = bool(body.google_calendar_include)
+            if requested and not google_calendar_connected(data_dir):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": {
+                            "code": "GOOGLE_CALENDAR_NOT_CONNECTED",
+                            "message": (
+                                "Google Calendar OAuth is not connected. "
+                                "Start the connect flow before enabling Include Google Calendar."
+                            ),
+                        }
+                    },
+                )
+            c.google_calendar_include = requested
+        if "google_calendar_oauth_client_id" in fs:
+            c.google_calendar_oauth_client_id = optional_config_string(
+                body.google_calendar_oauth_client_id
+            )
+        if "google_calendar_oauth_redirect_uri" in fs:
+            c.google_calendar_oauth_redirect_uri = optional_config_string(
+                body.google_calendar_oauth_redirect_uri
             )
         save_config(data_dir, c)
         if fs & _MP1_BACKEND_PATCH_FIELDS:
@@ -431,13 +473,32 @@ def create_app(
 
     @router.post("/calendar/events", status_code=201, response_model=CalendarEventCreateResponse)
     async def post_calendar_event(body: CalendarEventCreateRequest) -> CalendarEventCreateResponse:
-        """Create a Calendar event via EventKit (same as ``calendar.create_event`` tool)."""
+        """Create a Calendar event via local EventKit or Google Calendar."""
         try:
-            out = await run_create_event(body.model_dump(exclude_none=True))
+            args = body.model_dump(exclude_none=True)
+            c = load_config(data_dir)
+            target = args.get("calendar_target")
+            if c.google_calendar_include and target is None:
+                raise ValueError(
+                    "calendar_target is required when Google Calendar is included; "
+                    "use 'local' or 'google'"
+                )
+            if target == "google":
+                out = await create_google_calendar_event(data_dir, c, args)
+            else:
+                if target not in (None, "local"):
+                    raise ValueError("calendar_target must be 'local' or 'google'")
+                out = await run_create_event(args)
+                out["calendar_target"] = "local"
         except CalendarPermissionDenied as e:
             raise HTTPException(
                 status_code=403,
                 detail={"error": {"code": "PERMISSION_DENIED", "message": str(e)}},
+            ) from e
+        except GoogleCalendarApiError as e:
+            raise HTTPException(
+                status_code=502,
+                detail={"error": {"code": "GOOGLE_CALENDAR_API", "message": str(e)}},
             ) from e
         except ValueError as e:
             raise HTTPException(
@@ -445,6 +506,103 @@ def create_app(
                 detail={"error": {"code": "VALIDATION", "message": str(e)}},
             ) from e
         return CalendarEventCreateResponse(**out)
+
+    def _google_calendar_status_response() -> GoogleCalendarStatusResponse:
+        c = load_config(data_dir)
+        connected = google_calendar_connected(data_dir)
+        include = bool(c.google_calendar_include and connected)
+        status = "on" if include else ("connected_off" if connected else "off")
+        message = None
+        if c.google_calendar_include and not connected:
+            message = "Google Calendar Include was requested but no OAuth tokens are connected."
+        return GoogleCalendarStatusResponse(
+            include=include,
+            connected=connected,
+            status=status,
+            account_hint=google_calendar_account_hint(data_dir),
+            message=message,
+        )
+
+    @router.get("/calendar/google/status", response_model=GoogleCalendarStatusResponse)
+    async def get_google_calendar_status() -> GoogleCalendarStatusResponse:
+        """Google Calendar Include/connection state (Google calls are disabled when off)."""
+        return _google_calendar_status_response()
+
+    @router.post("/calendar/google/connect", response_model=GoogleCalendarConnectResponse)
+    async def connect_google_calendar() -> GoogleCalendarConnectResponse:
+        """Start Google Calendar OAuth by returning a consent URL for the client to open."""
+        try:
+            authorization_url, state = build_google_calendar_authorization_url(
+                data_dir,
+                load_config(data_dir),
+            )
+        except GoogleCalendarOAuthError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "GOOGLE_CALENDAR_OAUTH_CONFIG", "message": str(e)}},
+            ) from e
+        return GoogleCalendarConnectResponse(
+            authorization_url=authorization_url,
+            state=state,
+            expires_in_seconds=GOOGLE_CALENDAR_OAUTH_STATE_TTL_SECONDS,
+        )
+
+    @public_router.get("/calendar/google/callback", response_model=GoogleCalendarStatusResponse)
+    async def google_calendar_oauth_callback(
+        code: str | None = Query(default=None),
+        state: str | None = Query(default=None),
+        error: str | None = Query(default=None),
+    ) -> GoogleCalendarStatusResponse:
+        """Complete Google Calendar OAuth. Query values are never logged."""
+        if error:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": {
+                        "code": "GOOGLE_CALENDAR_OAUTH_CANCELLED",
+                        "message": "Google Calendar OAuth was cancelled or denied.",
+                    }
+                },
+            )
+        if not code or not state:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": {
+                        "code": "GOOGLE_CALENDAR_OAUTH_CALLBACK",
+                        "message": "Google Calendar OAuth callback requires code and state.",
+                    }
+                },
+            )
+        c = load_config(data_dir)
+        try:
+            await exchange_google_calendar_authorization_code(
+                data_dir,
+                c,
+                code=code,
+                state=state,
+            )
+        except GoogleCalendarOAuthError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "GOOGLE_CALENDAR_OAUTH_FAILED", "message": str(e)}},
+            ) from e
+        c.google_calendar_include = True
+        save_config(data_dir, c)
+        return _google_calendar_status_response()
+
+    @router.post("/calendar/google/disconnect", response_model=GoogleCalendarStatusResponse)
+    async def disconnect_google_calendar() -> GoogleCalendarStatusResponse:
+        """Best-effort revoke Google token storage, remove it locally, and force Include off."""
+        c = load_config(data_dir)
+        c.google_calendar_include = False
+        save_config(data_dir, c)
+        try:
+            await revoke_google_calendar_tokens(data_dir)
+        except GoogleCalendarApiError as e:
+            logger.warning("google_calendar_revoke_failed message=%s", str(e))
+        delete_google_calendar_tokens(data_dir)
+        return _google_calendar_status_response()
 
     @router.post("/memory/entries", status_code=201)
     async def post_memory(body: MemoryEntryRequest) -> MemoryEntryResponse:
@@ -660,6 +818,7 @@ def create_app(
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 
+    app.include_router(public_router)
     app.include_router(router)
 
     if static_dir.is_dir() and (static_dir / "index.html").is_file():

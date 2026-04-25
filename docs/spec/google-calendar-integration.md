@@ -42,7 +42,7 @@ Google access is never implied: turning **Include** on **starts OAuth**; the pro
 ### OAuth scopes (item 4 — clarified)
 
 - **Read path first:** `https://www.googleapis.com/auth/calendar.readonly` until Google-backed **create/update** is implemented.
-- **When implementing Google writes:** add `https://www.googleapis.com/auth/calendar.events` (or broader only if strictly needed). Wider scopes can trigger **Google OAuth app verification**; plan UX and compliance before promising write features broadly.
+- **Google writes:** use `https://www.googleapis.com/auth/calendar.events` (or broader only if strictly needed). Wider scopes can trigger **Google OAuth app verification**; plan UX and compliance before promising write features broadly.
 
 ### Logging redaction (item 5 — clarified)
 
@@ -86,6 +86,32 @@ A future optional **“Include off and delete tokens”** control may be added f
 - Minimal scopes to start (prefer `https://www.googleapis.com/auth/calendar.readonly`; add `https://www.googleapis.com/auth/calendar.events` when create/update is required).
 - Backend: store refresh tokens securely; call Calendar API for list/search (and events write when in scope).
 - Client: **Include Google Calendar** (starts OAuth; **on** only after success); **Disconnect Google** in settings when a Google account has been connected; visible state: off | OAuth in progress | on (connected).
+
+Initial backend foundation now includes `google_calendar_include` in config plus `GET /calendar/google/status`, `POST /calendar/google/connect`, `GET /calendar/google/callback`, and `POST /calendar/google/disconnect`. The server rejects `google_calendar_include: true` until OAuth token storage exists, preserving the rule that Include is only on after consent succeeds.
+
+OAuth configuration:
+
+- Public client ID: `google_calendar_oauth_client_id` in config or `GOOGLE_CALENDAR_CLIENT_ID`.
+- Redirect URI: `google_calendar_oauth_redirect_uri`, defaulting to `http://<host>:<port>/api/v1/calendar/google/callback`.
+- Client secret: `GOOGLE_CALENDAR_CLIENT_SECRET` or `secrets/google_calendar_client_secret.txt`; never exposed by `GET /config`.
+- Current implementation scope: `https://www.googleapis.com/auth/calendar.events` because Google-backed create is available. Existing read-only refresh tokens must reconnect before Google writes can succeed.
+- Google Cloud setup and smoke-test steps: [`google-calendar-setup.md`](google-calendar-setup.md).
+
+Read behavior implemented for `calendar.list_events` and `calendar.search_past_events`:
+
+- Include off: EventKit/local only; no Google calls.
+- Include on: refreshes a Google access token from the stored refresh token, queries Google Calendar events, merges local + Google rows by `starts_at`, and labels each row with `source` / `source_label`.
+- Past search uses Google Calendar `events.list` with `q`, `timeMin`, and `timeMax`.
+- Google failures soft-degrade: local results still return with `sources.google.degraded: true`.
+
+Write behavior implemented for `calendar.create_event` and `POST /calendar/events`:
+
+- Include off: omitted `calendar_target` defaults to local EventKit.
+- Include on: `calendar_target` is required (`local` or `google`) before writing.
+- Google target: creates an event via Google Calendar API `events.insert`, defaulting to calendar ID `primary`.
+- Full cleanup-enabled live write/disconnect smoke passed: Google event `7428q31oduk8koi5jp73tf2bv0` was created, deleted, and Google Include was turned off by disconnect.
+- Manual web UI smoke passed: browser form showed Local vs Google target choice and successfully created a Google Calendar event.
+- External revocation smoke passed: revoking Google access outside MemoryAgent produced safe Google degradation while local results remained available, and reconnect recovered.
 
 ### Phase 2 — Verification gate (“Google inclusion”)
 

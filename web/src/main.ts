@@ -22,6 +22,7 @@ type AppConfig = {
   watched_roots: string[];
   watch_ignore_globs: string[];
   watch_debounce_seconds: number;
+  google_calendar_include?: boolean;
 };
 
 function el(html: string): HTMLElement {
@@ -45,6 +46,15 @@ function shouldShowWelcome(): boolean {
 function dismissWelcome(): void {
   localStorage.setItem(WELCOME_DISMISSED, "true");
   localStorage.setItem(WELCOME_VERSION, SPEC_WELCOME_VERSION);
+}
+
+function calendarInputToIso(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("T") && /(?:Z|[+-]\d\d:?\d\d)$/.test(trimmed)) return trimmed;
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return trimmed;
+  return d.toISOString();
 }
 
 function simpleMarkdown(s: string): string {
@@ -111,6 +121,39 @@ async function apiMemory(text: string, token: string): Promise<void> {
     body: JSON.stringify({ text, tags: [], source: "web_ui" }),
   });
   if (!r.ok) throw new Error(`memory ${r.status}`);
+}
+
+async function apiCalendarCreate(
+  token: string,
+  body: {
+    title: string;
+    starts_at: string;
+    ends_at?: string;
+    location?: string;
+    notes?: string;
+    calendar_target?: "local" | "google";
+  },
+): Promise<{ event_id: string; title: string; starts_at: string; ends_at: string; calendar_target?: string; html_link?: string | null }> {
+  const r = await fetch(`${API}/calendar/events`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    let msg = `calendar create ${r.status}`;
+    try {
+      const j = (await r.json()) as { detail?: { error?: { message?: string } } | string };
+      const d = j.detail;
+      if (typeof d === "object" && d?.error?.message) msg = d.error.message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return (await r.json()) as { event_id: string; title: string; starts_at: string; ends_at: string; calendar_target?: string; html_link?: string | null };
 }
 
 async function apiConfigGet(token: string): Promise<AppConfig> {
@@ -226,6 +269,29 @@ function render(): void {
           <button id="addmem" type="button" style="margin-top: 0.5rem;">Save to memory</button>
           <p id="memstat" style="font-size: 0.85rem; color: #333; margin-top: 0.5rem;"></p>
         </section>
+        <section style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #eee;">
+          <h2 style="font-size: 1rem; margin: 0 0 0.5rem 0;">Create calendar event</h2>
+          <p id="calHint" style="font-size: 0.85rem; color: #555; margin: 0 0 0.5rem 0;">Loading calendar connection status…</p>
+          <div style="display: grid; gap: 0.5rem;">
+            <input id="calTitle" type="text" placeholder="Title" style="padding: 0.5rem;" />
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <input id="calStart" type="datetime-local" style="flex: 1; min-width: 16rem; padding: 0.5rem;" />
+              <input id="calEnd" type="datetime-local" style="flex: 1; min-width: 16rem; padding: 0.5rem;" />
+            </div>
+            <input id="calLocation" type="text" placeholder="Location (optional)" style="padding: 0.5rem;" />
+            <textarea id="calNotes" placeholder="Notes (optional)" style="width: 100%; min-height: 3rem; padding: 0.5rem; box-sizing: border-box;"></textarea>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <label for="calTarget" style="font-size: 0.85rem; font-weight: 600;">Calendar target</label>
+              <select id="calTarget" style="padding: 0.4rem;">
+                <option value="">Choose target…</option>
+                <option value="local">Local Calendar</option>
+                <option value="google">Google Calendar</option>
+              </select>
+              <button id="calCreate" type="button">Create event</button>
+            </div>
+          </div>
+          <p id="calStat" style="font-size: 0.85rem; color: #333; margin-top: 0.5rem;"></p>
+        </section>
         <section style="margin-top: 1rem; font-size: 0.8rem; color: #666;">
           <pre id="health" style="white-space: pre-wrap; margin: 0;">Loading health…</pre>
         </section>
@@ -330,7 +396,11 @@ function render(): void {
   const rootInput = root.querySelector("#rootInput") as HTMLInputElement;
   const rootList = root.querySelector("#rootList") as HTMLUListElement;
   const rootStat = root.querySelector("#rootStat") as HTMLElement;
+  const calHint = root.querySelector("#calHint") as HTMLElement;
+  const calTarget = root.querySelector("#calTarget") as HTMLSelectElement;
+  const calStat = root.querySelector("#calStat") as HTMLElement;
   let watchedRoots: string[] = [];
+  let googleCalendarIncluded = false;
 
   const renderRoots = () => {
     rootList.innerHTML = "";
@@ -370,6 +440,12 @@ function render(): void {
     try {
       const cfg = await apiConfigGet(token);
       watchedRoots = Array.isArray(cfg.watched_roots) ? [...cfg.watched_roots] : [];
+      googleCalendarIncluded = cfg.google_calendar_include === true;
+      calTarget.value = googleCalendarIncluded ? "" : "local";
+      calTarget.querySelector('option[value="google"]')?.toggleAttribute("disabled", !googleCalendarIncluded);
+      calHint.textContent = googleCalendarIncluded
+        ? "Google Calendar is included. Choose Local or Google before creating an event."
+        : "Google Calendar is off. Events will be created in the local Calendar.";
       renderRoots();
       rootStat.textContent = "Loaded watched roots.";
     } catch (e) {
@@ -476,6 +552,45 @@ function render(): void {
       (root.querySelector("#memtext") as HTMLTextAreaElement).value = "";
     } catch (e) {
       stat.textContent = String(e);
+    }
+  });
+
+  root.querySelector("#calCreate")!.addEventListener("click", async () => {
+    const token = getToken() || tokInput.value.trim();
+    if (!token) {
+      calStat.textContent = "Set a token first.";
+      return;
+    }
+    const title = (root.querySelector("#calTitle") as HTMLInputElement).value.trim();
+    const startsAt = calendarInputToIso((root.querySelector("#calStart") as HTMLInputElement).value);
+    const endsAt = calendarInputToIso((root.querySelector("#calEnd") as HTMLInputElement).value);
+    const location = (root.querySelector("#calLocation") as HTMLInputElement).value.trim();
+    const notes = (root.querySelector("#calNotes") as HTMLTextAreaElement).value.trim();
+    const target = calTarget.value as "" | "local" | "google";
+    if (!title || !startsAt) {
+      calStat.textContent = "Enter title and starts_at.";
+      return;
+    }
+    if (googleCalendarIncluded && !target) {
+      calStat.textContent = "Choose Local Calendar or Google Calendar before creating.";
+      return;
+    }
+    calStat.textContent = "Creating…";
+    try {
+      const created = await apiCalendarCreate(token, {
+        title,
+        starts_at: startsAt,
+        ...(endsAt ? { ends_at: endsAt } : {}),
+        ...(location ? { location } : {}),
+        ...(notes ? { notes } : {}),
+        calendar_target: target || "local",
+      });
+      const link = created.html_link
+        ? ` — <a href="${escapeHtml(created.html_link)}" target="_blank" rel="noreferrer">Open in Google Calendar</a>`
+        : "";
+      calStat.innerHTML = `Created ${escapeHtml(created.calendar_target ?? "local")} event: ${escapeHtml(created.title)} (${escapeHtml(created.event_id)})${link}`;
+    } catch (e) {
+      calStat.textContent = String(e);
     }
   });
 

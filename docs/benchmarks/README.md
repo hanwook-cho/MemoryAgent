@@ -2,6 +2,9 @@
 
 M5 hardening baseline reports live here.
 
+- Current dated baseline: [`m5-2026-04-25.md`](m5-2026-04-25.md)
+- Rolling latest copy: [`m5-latest.md`](m5-latest.md)
+
 ## Generate baseline report
 
 From repo root, with the core server running:

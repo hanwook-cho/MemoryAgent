@@ -51,11 +51,13 @@ Phases assume **web UI + local API** as the primary product surface ([`architect
 
 ## M5 — Product hardening
 
-- [x] NFR-1 / NFR-2 — **verified** (repeatable [`scripts/benchmark_m5.py`](../../scripts/benchmark_m5.py), baseline [`docs/benchmarks/m5-latest.md`](../benchmarks/m5-latest.md); Apple Silicon + OS in report; **NFR-2** within cap in artifact; **NFR-1** baselined for M5 per product review **2026-04-23**)
+- [x] NFR-1 / NFR-2 — **verified** (repeatable [`scripts/benchmark_m5.py`](../../scripts/benchmark_m5.py), current baseline [`docs/benchmarks/m5-2026-04-25.md`](../benchmarks/m5-2026-04-25.md), rolling latest [`docs/benchmarks/m5-latest.md`](../benchmarks/m5-latest.md); Apple Silicon + OS in report; **NFR-2** within cap in artifact; **NFR-1** baselined for M5 per product review **2026-04-23**)
 - [x] Log rotation, structured API errors — automated: [`services/core/tests/test_m5_logging.py`](../../services/core/tests/test_m5_logging.py), [`services/core/tests/test_m5_structured_errors.py`](../../services/core/tests/test_m5_structured_errors.py) (`VALIDATION`, `PERMISSION_DENIED`, `MODEL_UNAVAILABLE` on key routes + SSE `event: error`)
 - [x] Packaging / distribution model — **decision recorded** ([`m5-packaging-decision.md`](m5-packaging-decision.md)): **no product bundle** now (documented README + `scripts/`); **signed macOS .app** may follow after substantive product work; optional **`launchd`** doc later if desired
 
 **Acceptance:** Repeatable benchmark doc; no unbounded log growth in default config.
+
+**2026-04-25 smoke:** `./scripts/setup-dev.sh` exits 0 on the reference Mac, confirms default Ollama models are installed, and the running core service returns healthy with `deployment.degraded=false`.
 
 ## Optional — Native shell
 

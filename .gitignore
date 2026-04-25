@@ -3,6 +3,10 @@
 .memoryagent-edge/
 .memoryagent-edge-smoke/
 
+# OAuth/client secrets downloaded during local setup
+client_secret_*.json
+google_calendar_client_secret.txt
+
 # Python
 .venv/
 venv/

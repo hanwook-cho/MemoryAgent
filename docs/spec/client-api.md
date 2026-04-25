@@ -113,7 +113,59 @@ Response `201` with `document_id` and ingestion job id.
 
 `POST /calendar/events`
 
-Creates an event via EventKit (native bridge). Request/response shapes are defined in [`agent-actions.md`](agent-actions.md).
+Creates an event via local EventKit or Google Calendar. When `google_calendar_include` is off, omitted `calendar_target` defaults to local EventKit. When `google_calendar_include` is on, callers must provide `calendar_target: "local"` or `calendar_target: "google"` so the server never guesses which calendar system to write to. Google writes require OAuth consent including `https://www.googleapis.com/auth/calendar.events`.
+
+Optional request fields for Google writes:
+
+- `calendar_target`: `local` or `google`.
+- `google_calendar_id`: Google calendar ID; defaults to `primary`.
+- `calendar_id`: provider-specific calendar ID. For Google, `google_calendar_id` is preferred when both are present.
+
+Response includes `calendar_target`; Google responses may include `calendar_id` and `html_link`.
+
+### 3.5.1 Google Calendar connection state
+
+`GET /calendar/google/status`
+
+Returns Google Calendar inclusion state without exposing secrets:
+
+```json
+{
+  "include": false,
+  "connected": false,
+  "status": "off",
+  "account_hint": null,
+  "message": null
+}
+```
+
+- `off`: no usable Google connection; clients must not call Google-backed calendar paths.
+- `connected_off`: OAuth tokens are stored, but Include Google Calendar is disabled.
+- `on`: Include Google Calendar is active; local and Google calendar reads may both be used.
+
+`POST /calendar/google/connect`
+
+Starts OAuth and returns a Google consent URL for the client to open:
+
+```json
+{
+  "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "state": "opaque-state",
+  "expires_in_seconds": 600
+}
+```
+
+Requires `google_calendar_oauth_client_id` in config or `GOOGLE_CALENDAR_CLIENT_ID` in the environment. The OAuth client secret is never returned by the API; set it via `GOOGLE_CALENDAR_CLIENT_SECRET` or store it in `secrets/google_calendar_client_secret.txt`.
+
+`GET /calendar/google/callback?code=...&state=...`
+
+Completes OAuth, stores tokens under local `secrets/` with restrictive file permissions, and turns Include Google Calendar on. The server must not log authorization codes, access tokens, refresh tokens, or full callback URLs.
+
+`POST /calendar/google/disconnect`
+
+Deletes local Google Calendar token storage when present, sets Include Google Calendar off, and returns the same status shape.
+
+When `google_calendar_include` is on, `calendar.list_events` and `calendar.search_past_events` query both EventKit local calendar and Google Calendar, merge the rows chronologically, and label each event with `source` / `source_label` (`local` / `Local Calendar`, `google` / `Google Calendar`). Past search uses Google Calendar `events.list` with `q`, `timeMin`, and `timeMax`. If Google refresh or event listing/search fails, the tool returns local events with `sources.google.degraded: true` and a safe `degraded_reason`. `calendar.create_event` follows the same target rule as `POST /calendar/events`: if Include is on, `calendar_target` is required.
 
 ### 3.6 Search
 
@@ -127,11 +179,11 @@ Optional filters:
 
 ### 3.7 Configuration (read)
 
-`GET /config` — safe subset (no secrets): watched paths, model names, feature flags, `deployment_mode`, optional `edge_base_url` (HTTPS edge Node base URL for distributed modes), optional edge TLS fields (`edge_tls_ca_bundle`, `edge_tls_insecure_skip_verify`, `edge_tls_spki_pins_sha256` for SPKI SHA-256 pinning), optional host→edge path prefixes for remote file ingest (`edge_ingest_path_host_prefix`, `edge_ingest_path_edge_prefix`).
+`GET /config` — safe subset (no secrets): watched paths, model names, feature flags, `deployment_mode`, optional `edge_base_url` (HTTPS edge Node base URL for distributed modes), optional edge TLS fields (`edge_tls_ca_bundle`, `edge_tls_insecure_skip_verify`, `edge_tls_spki_pins_sha256` for SPKI SHA-256 pinning), optional host→edge path prefixes for remote file ingest (`edge_ingest_path_host_prefix`, `edge_ingest_path_edge_prefix`), `google_calendar_include`, `google_calendar_oauth_client_id`, and `google_calendar_oauth_redirect_uri`.
 
 ### 3.8 Configuration (write)
 
-`PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`, `deployment_mode`, `edge_base_url` (empty string clears `edge_base_url`), the edge TLS and `edge_ingest_path_*` fields above (including `edge_tls_spki_pins_sha256` as a JSON array; use `[]` to clear pins). Changing any of those edge-related keys rebinds retrieval/ingest clients in-process.
+`PATCH /config` — may include any subset of `watched_roots`, `watch_ignore_globs`, `watch_debounce_seconds`, `deployment_mode`, `edge_base_url` (empty string clears `edge_base_url`), the edge TLS and `edge_ingest_path_*` fields above (including `edge_tls_spki_pins_sha256` as a JSON array; use `[]` to clear pins), `google_calendar_include`, `google_calendar_oauth_client_id`, and `google_calendar_oauth_redirect_uri`. Setting `google_calendar_include: true` requires a completed Google OAuth connection; otherwise the server returns `409 GOOGLE_CALENDAR_NOT_CONNECTED`. Changing any of those edge-related keys rebinds retrieval/ingest clients in-process.
 
 **SPKI pins (how to compute, when to rotate):** see [`node-api.md`](node-api.md) §2.1.
 

@@ -128,6 +128,7 @@ def test_get_config_includes_deployment_mode(client: TestClient, data_dir: Path)
     assert body.get("deployment_mode") == "standalone"
     assert "edge_base_url" in body
     assert body.get("edge_base_url") is None
+    assert body.get("google_calendar_include") is False
 
 
 def test_patch_config_invalid_deployment_mode(client: TestClient, data_dir: Path) -> None:
@@ -179,6 +180,55 @@ def test_patch_config_edge_base_url_clear(client: TestClient, data_dir: Path) ->
     assert r.json().get("edge_base_url") in (None, "")
     c = load_config(data_dir)
     assert c.edge_base_url is None
+
+
+def test_patch_config_google_calendar_include_requires_connection(
+    client: TestClient, data_dir: Path
+) -> None:
+    r = client.patch(
+        "/api/v1/config",
+        headers=_auth(data_dir),
+        json={"google_calendar_include": True},
+    )
+    assert r.status_code == 409
+    assert r.json()["detail"]["error"]["code"] == "GOOGLE_CALENDAR_NOT_CONNECTED"
+    assert load_config(data_dir).google_calendar_include is False
+
+
+def test_patch_config_google_calendar_include_false_persists(
+    client: TestClient, data_dir: Path
+) -> None:
+    r = client.patch(
+        "/api/v1/config",
+        headers=_auth(data_dir),
+        json={"google_calendar_include": False},
+    )
+    assert r.status_code == 200
+    assert r.json()["google_calendar_include"] is False
+    assert load_config(data_dir).google_calendar_include is False
+
+
+def test_patch_config_google_calendar_oauth_settings_persist(
+    client: TestClient, data_dir: Path
+) -> None:
+    r = client.patch(
+        "/api/v1/config",
+        headers=_auth(data_dir),
+        json={
+            "google_calendar_oauth_client_id": "client-id.example.test",
+            "google_calendar_oauth_redirect_uri": (
+                "http://127.0.0.1:8765/api/v1/calendar/google/callback"
+            ),
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["google_calendar_oauth_client_id"] == "client-id.example.test"
+    c = load_config(data_dir)
+    assert c.google_calendar_oauth_client_id == "client-id.example.test"
+    assert (
+        c.google_calendar_oauth_redirect_uri
+        == "http://127.0.0.1:8765/api/v1/calendar/google/callback"
+    )
 
 
 def test_app_state_exposes_backends(client: TestClient, data_dir: Path) -> None:

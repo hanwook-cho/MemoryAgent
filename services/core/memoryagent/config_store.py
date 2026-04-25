@@ -108,6 +108,10 @@ class AppConfig:
     edge_ingest_path_edge_prefix: str | None = None
     # SPKI SHA-256 pins (hex, 64 chars each); enforced on edge HTTPS after CA validation.
     edge_tls_spki_pins_sha256: list[str] = field(default_factory=list)
+    # Google Calendar integration: off by default; on only after OAuth token storage exists.
+    google_calendar_include: bool = False
+    google_calendar_oauth_client_id: str | None = None
+    google_calendar_oauth_redirect_uri: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AppConfig:
@@ -136,6 +140,13 @@ class AppConfig:
             edge_tls_spki_pins_sha256=normalize_edge_spki_pins_sha256(
                 d.get("edge_tls_spki_pins_sha256")
             ),
+            google_calendar_include=bool(d.get("google_calendar_include", False)),
+            google_calendar_oauth_client_id=optional_config_string(
+                d.get("google_calendar_oauth_client_id")
+            ),
+            google_calendar_oauth_redirect_uri=optional_config_string(
+                d.get("google_calendar_oauth_redirect_uri")
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -162,6 +173,9 @@ class AppConfig:
         d["edge_ingest_path_host_prefix"] = self.edge_ingest_path_host_prefix
         d["edge_ingest_path_edge_prefix"] = self.edge_ingest_path_edge_prefix
         d["edge_tls_spki_pins_sha256"] = list(self.edge_tls_spki_pins_sha256)
+        d["google_calendar_include"] = self.google_calendar_include
+        d["google_calendar_oauth_client_id"] = self.google_calendar_oauth_client_id
+        d["google_calendar_oauth_redirect_uri"] = self.google_calendar_oauth_redirect_uri
         return d
 
 
